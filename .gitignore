@@ -4,3 +4,7 @@ build
 
 bnn_params
 experiment_results
+
+.venv
+.DS_Store
+pybnn
