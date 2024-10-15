@@ -1,0 +1,3 @@
+[submodule "evidential-learning-pytorch"]
+	path = evidential-learning-pytorch
+	url = https://github.com/teddykoker/evidential-learning-pytorch.git
