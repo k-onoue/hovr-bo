@@ -18,7 +18,7 @@ class MLP(nn.Module):
         )
 
     def forward(self, x):
-        return self.layers(x)
+        return self.layers
 
 
 # HOVR正則化の定義
@@ -61,3 +61,7 @@ def train_model(X, y, model, optimizer, hovr_lambda=None, hovr_k=None, hovr_q=No
 
         loss.backward()
         optimizer.step()
+
+
+
+
