@@ -1,5 +1,3 @@
-# ToDo
+# hello
 
-- replication
-- try with bnn
-- implment proposed method
+https://github.com/teddykoker/evidential-learning-pytorch
