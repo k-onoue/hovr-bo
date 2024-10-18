@@ -58,7 +58,6 @@ def hovr_reg(model, x, k=3, q=2, num_points=10):
     return hovr_term / x.shape[1]  # Normalize by the input dimension
 
 
-# Modular EvidentialMLP model
 class EvidentialMLP(nn.Module):
     def __init__(
         self,
@@ -69,6 +68,7 @@ class EvidentialMLP(nn.Module):
         nig_coeff=1.0,
         nsu_coeff=0.0,
         hovr_coeff=0.0,
+        l2_coeff=0.0
     ):
         super(EvidentialMLP, self).__init__()
         layers = []
@@ -83,22 +83,23 @@ class EvidentialMLP(nn.Module):
                 layers.append(nn.Tanh())
             elif activation == "sigmoid":
                 layers.append(nn.Sigmoid())
-            # Additional activation functions can be added here
             in_dim = hidden_dim
 
         # Final output layer (NormalInvGamma)
-        layers.append(NormalInvGamma(hidden_units[-1], output_dim))
+        self.normal_inv_gamma = NormalInvGamma(hidden_units[-1], output_dim)
 
-        # Combine the layers into a Sequential model
-        self.model = nn.Sequential(*layers)
+        # Combine the layers into a Sequential model for MLP
+        self.mlp = nn.Sequential(*layers)
 
-        # Set coefficients for NIG, NSU, and HOVR regularization
+        # Set coefficients for NIG, NSU, HOVR, and L2 regularization
         self.nig_coeff = nig_coeff
         self.nsu_coeff = nsu_coeff
         self.hovr_coeff = hovr_coeff
+        self.l2_coeff = l2_coeff
 
     def forward(self, x):
-        return self.model(x)
+        x = self.mlp(x)
+        return self.normal_inv_gamma(x)
 
     # Method to compute the mean and standard deviation from NIG output
     def predict(self, x, pred=None):
@@ -108,17 +109,20 @@ class EvidentialMLP(nn.Module):
         std = torch.sqrt(beta / (v * (alpha - 1)))
         return mu, std
 
-    # Loss function method for NIG, NSU, and HOVR regularization
+    # Loss function method for NIG, NSU, HOVR, and L2 regularization
     def compute_loss(self, dist_params, y, x=None):
         """
-        Compute the loss function, including NIG loss and optional NSU and HOVR regularization.
+        Compute the loss function, including NIG loss and optional NSU, HOVR, and L2 regularization.
         :param dist_params: Tuple (mu, v, alpha, beta) from NormalInvGamma layer
         :param y: Target values
         :param x: Input data, required for HOVR regularization
         :return: Computed loss
         """
         # NIG negative log-likelihood and regularization
-        loss = nig_nll(*dist_params, y) + self.nig_coeff * nig_reg(*dist_params, y)
+        loss = nig_nll(*dist_params, y) 
+        
+        if self.nig_coeff > 0.0:
+            loss += self.nig_coeff * nig_reg(*dist_params, y)
 
         # NSU regularization if the coefficient is non-zero
         if self.nsu_coeff > 0.0:
@@ -128,6 +132,11 @@ class EvidentialMLP(nn.Module):
         if self.hovr_coeff > 0.0:
             assert x is not None, "Input `x` is required for HOVR regularization."
             loss += self.hovr_coeff * hovr_reg(self, x)
+
+        # L2 Regularization (Weight Decay) only on MLP layers (excluding NormalInvGamma)
+        if self.l2_coeff > 0.0:
+            l2_norm = sum(p.pow(2.0).sum() for p in self.mlp.parameters())  # L2 norm only for MLP parameters
+            loss += self.l2_coeff * l2_norm
 
         return loss
 
