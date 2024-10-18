@@ -26,9 +26,6 @@ def nsu_reg(gamma, v, alpha, beta, y):
     return reg.mean()
 
 
-
-
-
 # HOVR regularization adapted for the EvidentialMLP model
 def hovr_reg(model, x, k=3, q=2, num_points=10):
     # Generate random points within the input range
@@ -135,77 +132,20 @@ class EvidentialMLP(nn.Module):
         return loss
 
 
-
-#############################################################################
-import torch
-from torch.utils.data import DataLoader, TensorDataset
-import matplotlib.pyplot as plt
-import numpy as np
-
-# Create toy y = x^3 + noise data
-def generate_toy_data():
-    torch.manual_seed(0)
-    x_train = torch.linspace(-4, 4, 1000).unsqueeze(-1)
-    sigma = torch.normal(torch.zeros_like(x_train), 3 * torch.ones_like(x_train))
-    y_train = x_train**3 + sigma
-
-    x_test = torch.linspace(-7, 7, 1000).unsqueeze(-1)
-    y_test = x_test**3
-
-    return x_train, y_train, x_test, y_test
-
-# Train the model on the toy dataset
-def train_model(model, x_train, y_train, epochs=500, batch_size=100, lr=5e-4):
+# Training function for EvidentialMLP model
+def train_ern(model, X_tensor, y_tensor, num_epochs=500, lr=0.01):
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    for epoch in range(epochs):
+    
+    for epoch in range(num_epochs):
         model.train()
-        for x, y in DataLoader(TensorDataset(x_train, y_train), batch_size=batch_size, shuffle=True):
-            pred = model(x)
-            loss = model.compute_loss(pred, y, x)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-# Plot the prediction results
-def plot_results(model, x_train, y_train, x_test, y_test, save_path="cubic_regression.png"):
-    with torch.no_grad():
-        pred = model(x_test)
-        mu, std = model.predict(x_test, pred)
-
-    plt.figure(figsize=(6, 4), dpi=200)
-    plt.scatter(x_train, y_train, s=1.0, c="tab:blue", label="Train")
-    plt.plot(x_test, y_test, c="k", label="True")
-    plt.plot(x_test.squeeze(), mu, c="tab:blue", ls="--", label="Pred")
-    plt.fill_between(
-        x_test.squeeze(), (mu - 2 * std), (mu + 2 * std),
-        alpha=0.2, facecolor="tab:blue", label="Unc."
-    )
-    plt.gca().set_ylim(-150, 150)
-    plt.gca().set_xlim(-7, 7)
-    plt.legend(loc="upper left")
-    plt.savefig(save_path)
-    plt.show()
-
-if __name__ == "__main__":
-    # Generate toy dataset
-    x_train, y_train, x_test, y_test = generate_toy_data()
-
-    # Initialize model with customized settings
-    model_config = {
-        "input_dim": 1,
-        "output_dim": 1,
-        "hidden_units": [128, 128, 128],
-        "activations": ["tanh", "relu", "relu"],
-        "nig_coeff": 1e-2,
-        # "nsu_coeff": 1e-3,
-        "nsu_coeff": 0,
-        "hovr_coeff": 1e-4,
-        # "hovr_coeff": 0,
-    }
-    model = EvidentialMLP(**model_config)
-
-    # Train the model
-    train_model(model, x_train, y_train)
-
-    # Plot the results
-    plot_results(model, x_train, y_train, x_test, y_test)
+        optimizer.zero_grad()
+        
+        # Full batch passed to model
+        preds = model(X_tensor)
+        
+        # Compute the loss
+        loss = model.compute_loss(preds, y_tensor, X_tensor)
+        
+        # Backpropagation and optimization
+        loss.backward()
+        optimizer.step()

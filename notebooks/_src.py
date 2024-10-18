@@ -10,10 +10,13 @@ LOG_DIR = config["paths"]["logs_dir"]
 DB_DIR = config["paths"]["dbs_dir"]
 sys.path.append(PROJECT_DIR)
 
-from src.models import MLP, hovr_regularization, train_model
+from src.ern import EvidentialMLP
+from src.ern import train_ern
+from src.ern import nsu_reg, hovr_reg
 
 __all__ = [
-    "MLP",
-    "hovr_regularization",
-    "train_model",
+    "EvidentialMLP",
+    "train_ern",
+    "nsu_reg",
+    "hovr_reg",
 ]
