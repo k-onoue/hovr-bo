@@ -27,7 +27,7 @@ cycler==0.12.1
 debugpy==1.8.1
 decorator==5.1.1
 defusedxml==0.7.1
-edl-pytorch @ git+ssh://git@github.com/teddykoker/evidential-learning-pytorch.git@c0110564a68e5debc4fd16a713bcb13294118039
+edl-pytorch @ git+https://github.com/teddykoker/evidential-learning-pytorch.git@c0110564a68e5debc4fd16a713bcb13294118039
 executing==2.0.1
 fastjsonschema==2.19.1
 filelock==3.16.0
