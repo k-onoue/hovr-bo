@@ -13,6 +13,3 @@ def generate_toy_data():
     y_test = x_test**3
 
     return x_train, y_train, x_test, y_test
-
-
-#
