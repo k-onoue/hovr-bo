@@ -1,6 +1,7 @@
 name: hovr-env
 dependencies:
   - python=3.12
+  - pygobject  # conda経由でインストール
   - pip
   - pip:
       - alembic==1.13.1
