@@ -2,7 +2,7 @@
 
 # ローカルの results ディレクトリと logs ディレクトリを作成
 mkdir -p results/
-mkdir -p logs/
+mkdir -p venv/  # 仮想環境を保存するためのディレクトリを作成
 
 # 現在の日付を取得（YYYY-MM-DD形式）
 DATE="2024-10-23"
@@ -17,22 +17,16 @@ FROM python:3.12
 # 作業ディレクトリを設定
 WORKDIR /app
 
-# 必要なシステム依存ライブラリをインストール
-RUN apt-get update && apt-get install -y \\
-    pkg-config \\
-    libgirepository1.0-dev \\
-    gobject-introspection \\
-    && rm -rf /var/lib/apt/lists/*
+# 仮想環境のディレクトリをホスト側と共有するボリュームを利用
+COPY requirements.txt .  # requirements.txtのみをコピー
+RUN python -m venv /app/venv && \\
+    /app/venv/bin/pip install --no-cache-dir -r requirements.txt
 
-# 必要な Python パッケージをインストール (requirements.txt がある場合)
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# プロジェクトファイルをすべてコピー
+# プロジェクトファイルをすべてコピー（requirements.txt以外）
 COPY . .
 
-# コンテナ起動時に実行するコマンドを指定
-CMD [\"python3\", \"experiments/$DATE/hmc.py\"]
+# 仮想環境を有効化してからコマンドを実行
+CMD [\"/app/venv/bin/python\", \"experiments/$DATE/hmc.py\"]
 "
 
 # Dockerfile を書き込み
@@ -55,13 +49,14 @@ DOCKER_IMAGE="hovr-env"
 echo "Dockerイメージをビルドしています..."
 docker build -t $DOCKER_IMAGE .
 
-# Dockerでコンテナを実行し、resultsディレクトリをボリュームマウント
-# ホストのresultsディレクトリをコンテナの/app/resultsにマウント
+# Dockerでコンテナを実行し、仮想環境をホストに保存して再利用
+# ホストのresultsディレクトリ、logsディレクトリ、config.ini、仮想環境をコンテナにマウント
 echo "Dockerコンテナを実行しています..."
 docker run --rm \
     -v "$(pwd)/results":/app/results \
     -v "$(pwd)/logs":/app/logs \
     -v "$(pwd)/config.ini":/app/config.ini \
+    -v "$(pwd)/venv":/app/venv \  # 仮想環境をホスト上に保存
     "$DOCKER_IMAGE"
 
 # 実行完了のメッセージ
