@@ -160,7 +160,8 @@ if __name__ == "__main__":
 
     set_logger(name, LOG_DIR)
 
-    for n_sigma in [1e-4, 1e-3, 1e-2, 1e-1, 1, 2, 3]:
+    # for n_sigma in [1e-4, 1e-3, 1e-2, 1e-1, 1, 2, 3]:
+    for n_sigma in [i * 1e-1 for i in range(2, 10)]:
 
         logging.info(f"Start experiment with prior_std={n_sigma}")
 
