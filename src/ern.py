@@ -26,6 +26,29 @@ def nsu_reg(gamma, v, alpha, beta, y):
     return reg.mean()
 
 
+# Lipschitz Modified MSE Regularization
+# Implemented based on the equation in the paper (equation 6)
+def lipschitz_mse_reg(gamma, v, alpha, beta, y):
+    # Calculate the squared error (y - gamma)^2
+    error = (y - gamma).pow(2)
+    
+    # Calculate U_alpha and U_nu based on the given formula
+    U_nu = beta * (1 + v) / (alpha * v)
+    U_alpha = 2 * beta * (1 + v) / v * (torch.exp(torch.digamma(alpha + 0.5) - torch.digamma(alpha)) - 1)
+
+    # Minimum U_nu and U_alpha value to control the Lipschitz constant
+    U_nu_alpha = torch.min(U_nu, U_alpha)
+
+    # Lipschitz Modified MSE: switch between normal MSE and Lipschitz adjusted term
+    modified_mse = torch.where(
+        error < U_nu_alpha, 
+        error, 
+        2 * torch.sqrt(U_nu_alpha) * torch.abs(y - gamma) - U_nu_alpha
+    )
+
+    return modified_mse.mean()
+
+
 # HOVR regularization adapted for the EvidentialMLP model
 def hovr_reg(model, x, k=3, q=2, num_points=10):
     # Generate random points within the input range
