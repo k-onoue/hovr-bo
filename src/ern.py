@@ -91,6 +91,7 @@ class EvidentialMLP(nn.Module):
         nig_coeff=1.0,
         nsu_coeff=0.0,
         hovr_coeff=0.0,
+        lipschitz_coeff=0.0,  # Added for Lipschitz regularization
         l2_coeff=0.0
     ):
         super(EvidentialMLP, self).__init__()
@@ -114,10 +115,11 @@ class EvidentialMLP(nn.Module):
         # Combine the layers into a Sequential model for MLP
         self.mlp = nn.Sequential(*layers)
 
-        # Set coefficients for NIG, NSU, HOVR, and L2 regularization
+        # Set coefficients for NIG, NSU, HOVR, Lipschitz MSE, and L2 regularization
         self.nig_coeff = nig_coeff
         self.nsu_coeff = nsu_coeff
         self.hovr_coeff = hovr_coeff
+        self.lipschitz_coeff = lipschitz_coeff  # Added for Lipschitz regularization
         self.l2_coeff = l2_coeff
 
     def forward(self, x):
@@ -132,10 +134,10 @@ class EvidentialMLP(nn.Module):
         std = torch.sqrt(beta / (v * (alpha - 1)))
         return mu, std
 
-    # Loss function method for NIG, NSU, HOVR, and L2 regularization
+    # Loss function method for NIG, NSU, HOVR, Lipschitz MSE, and L2 regularization
     def compute_loss(self, dist_params, y, x=None):
         """
-        Compute the loss function, including NIG loss and optional NSU, HOVR, and L2 regularization.
+        Compute the loss function, including NIG loss and optional NSU, HOVR, Lipschitz MSE, and L2 regularization.
         :param dist_params: Tuple (mu, v, alpha, beta) from NormalInvGamma layer
         :param y: Target values
         :param x: Input data, required for HOVR regularization
@@ -156,6 +158,10 @@ class EvidentialMLP(nn.Module):
             assert x is not None, "Input `x` is required for HOVR regularization."
             loss += self.hovr_coeff * hovr_reg(self, x)
 
+        # Lipschitz MSE regularization if the coefficient is non-zero
+        if self.lipschitz_coeff > 0.0:
+            loss += self.lipschitz_coeff * lipschitz_mse_reg(*dist_params, y)
+
         # L2 Regularization (Weight Decay) only on MLP layers (excluding NormalInvGamma)
         if self.l2_coeff > 0.0:
             l2_norm = sum(p.pow(2.0).sum() for p in self.mlp.parameters())  # L2 norm only for MLP parameters
@@ -169,6 +175,7 @@ def train_ern(model, X_tensor, y_tensor, num_epochs=500, lr=0.01):
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     
     for epoch in range(num_epochs):
+        
         model.train()
         optimizer.zero_grad()
         
@@ -181,3 +188,5 @@ def train_ern(model, X_tensor, y_tensor, num_epochs=500, lr=0.01):
         # Backpropagation and optimization
         loss.backward()
         optimizer.step()
+
+        print(f"Epoch {epoch + 1}/{num_epochs}: Loss={loss.item():.4f}")
