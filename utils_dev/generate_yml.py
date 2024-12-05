@@ -1,6 +1,7 @@
+import argparse
 import re
 import sys
-import argparse
+
 
 def parse_requirements(file_path):
     with open(file_path, 'r') as file:

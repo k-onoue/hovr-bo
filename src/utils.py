@@ -1,12 +1,11 @@
-import numpy as np
-import plotly.graph_objects as go
-import torch
-
-
 import datetime
 import logging
 import os
 import sys
+
+import numpy as np
+import plotly.graph_objects as go
+import torch
 
 
 def set_logger(log_filename_base, save_dir):
@@ -20,7 +19,6 @@ def set_logger(log_filename_base, save_dir):
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[logging.FileHandler(log_filepath), logging.StreamHandler(sys.stdout)],
     )
-
 
 
 # Create toy y = x^3 + noise data

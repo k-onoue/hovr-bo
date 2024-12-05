@@ -1,3 +1,15 @@
+"""
+1. 以下の実装を参考にして botorch model を作る
+https://github.com/yucenli/bnn-bo/blob/main/models/laplace.py
+
+2. ax で使用できるようにする
+https://botorch.org/tutorials/custom_botorch_model_in_ax
+
+3. 獲得関数は以下を使用する
+https://botorch.org/api/acquisition.html#botorch.acquisition.monte_carlo.qNoisyExpectedImprovement
+"""
+
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
