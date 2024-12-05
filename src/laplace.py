@@ -4,20 +4,18 @@ import torch.optim as optim
 import plotly.graph_objects as go
 import numpy as np
 
-# MLPの定義 (通常のNNとして定義)
+
 class MLP(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_units, activations):
         super(MLP, self).__init__()
         layers = []
         in_dim = input_dim
 
-        # 指定された hidden_units と activations に基づいて層を構築
         for hidden_dim, activation in zip(hidden_units, activations):
             layers.append(nn.Linear(in_dim, hidden_dim))
             layers.append(self.get_activation(activation))
             in_dim = hidden_dim
 
-        # 最後の出力層
         layers.append(nn.Linear(in_dim, output_dim))
         self.mlp = nn.Sequential(*layers)
 
@@ -26,7 +24,6 @@ class MLP(nn.Module):
 
     @staticmethod
     def get_activation(activation):
-        # 活性化関数の設定
         if activation == "relu":
             return nn.ReLU()
         elif activation == "tanh":

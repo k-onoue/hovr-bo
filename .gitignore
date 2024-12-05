@@ -1,12 +1,9 @@
 .DS_Store/
-.venv/
-hovr-env/
+.venv_hovr/
 data/
 __pycache__/
 results/
-logs/
-logs-archive/
 retrieve.sh
 retrieve_double.sh
 retrieve*.sh
-images/
+notebooks/
