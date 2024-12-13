@@ -61,12 +61,14 @@ class LaplaceBNN(Model):
         self.noise_var = args["noise_var"] if "noise_var" in args else torch.tensor(1.0)
         self.likelihood = "regression"
         self.iterative = args["iterative"] if "iterative" in args else False
-        self.nn = RegNet(dimensions=self.regnet_dims,
-                        activation=self.regnet_activation,
-                        input_dim=input_dim,
-                        output_dim=output_dim,
-                        dtype=torch.float64,
-                        device=device)
+        self.nn = RegNet(
+            dimensions=self.regnet_dims,
+            activation=self.regnet_activation,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            dtype=torch.float64,
+            device=device
+        )
         self.bnn = None
         self.output_dim = output_dim
 
