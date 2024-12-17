@@ -14,7 +14,8 @@ class OutlierTestProblem(BaseTestProblem):
         noise_std: Optional[float] = None,
         negate: bool = False,
         outlier_prob: Optional[float] = None,
-        outlier_scale: float = 10.0,
+        outlier_scale: float = 5.0,
+        outlier_std: float = 1.0,
     ):
         r"""
         Args:
@@ -27,6 +28,7 @@ class OutlierTestProblem(BaseTestProblem):
         super().__init__(noise_std=noise_std, negate=negate)
         self.outlier_prob = outlier_prob  # Probability threshold for outlier occurrence
         self.outlier_scale = outlier_scale  # Scale factor for outlier magnitude
+        self.outlier_std = outlier_std  # Standard deviation of the outlier noise
 
     def forward(self, X: Tensor, noise: bool = True) -> Tensor:
         r"""
@@ -51,6 +53,19 @@ class OutlierTestProblem(BaseTestProblem):
             outliers = _outlier * torch.randn_like(f)
             f = torch.where(outlier_mask, f + outliers, f)
 
+        # Inject outliers if outlier_prob is specified
+        if self.outlier_prob is not None:
+            outlier_mask = torch.rand_like(f) < self.outlier_prob  # Mask for outlier locations
+            
+            # Flip sign of outlier_scale with probability 1/2
+            sign_flip = torch.where(torch.rand_like(f) > 0.5, 1.0, -1.0)
+            _scale = torch.tensor(self.outlier_scale, device=X.device, dtype=X.dtype)
+            _std = torch.tensor(self.outlier_std, device=X.device, dtype=X.dtype)
+            base_outlier = sign_flip * _scale + _std * torch.randn_like(f)
+            
+            # Add outliers to the original function values
+            f = torch.where(outlier_mask, f + base_outlier, f)
+
         if self.negate:
             f = -f
         
@@ -68,7 +83,8 @@ class SyntheticSine(OutlierTestProblem):
         noise_std: Optional[float] = None, 
         negate: bool = False,
         outlier_prob: Optional[float] = None,
-        outlier_scale: float = 10.0,
+        outlier_scale: float = 5.0,
+        outlier_std: float = 1.0,
     ):
         r"""
         Args:
@@ -84,7 +100,8 @@ class SyntheticSine(OutlierTestProblem):
             noise_std=noise_std, 
             negate=negate, 
             outlier_prob=outlier_prob, 
-            outlier_scale=outlier_scale
+            outlier_scale=outlier_scale,
+            outlier_std=outlier_std
         )
     
     def evaluate_true(self, X: Tensor) -> Tensor:
@@ -121,7 +138,8 @@ class BraninFoo(OutlierTestProblem):
         noise_std: Optional[float] = None, 
         negate: bool = False,
         outlier_prob: Optional[float] = None,
-        outlier_scale: float = 10.0,
+        outlier_scale: float = 5.0,
+        outlier_std: float = 1.0,
     ):
         r"""
         Args:
@@ -137,7 +155,8 @@ class BraninFoo(OutlierTestProblem):
             noise_std=noise_std, 
             negate=negate, 
             outlier_prob=outlier_prob, 
-            outlier_scale=outlier_scale
+            outlier_scale=outlier_scale,
+            outlier_std=outlier_std
         )
     
     def evaluate_true(self, X: Tensor) -> Tensor:
