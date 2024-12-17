@@ -77,6 +77,13 @@ class RelativeSampler(Sampler):
 
         self.sampler = sampler
         self.sampler_kwargs = kwargs
+
+
+        print(f"train_X: {train_X}")
+        print(f"train_Y: {train_Y}")
+        print(f"self.train_X: {self.train_X}")
+        print(f"self.train_Y: {self.train_Y}")
+
     
     def sample(self) -> torch.Tensor:
         # Sample in normalized space
@@ -100,4 +107,5 @@ class RelativeSampler(Sampler):
             normalized_candidates,
             bounds=self.bounds
         )
+        
         return candidates

@@ -9,10 +9,9 @@ from gpytorch import distributions as gdists
 from laplace import Laplace
 from torch import Tensor
 
-# from .utils import RegNet, get_best_hyperparameters
-# from .utils import augmented_and_regularized_trimmed_loss
-from utils import RegNet, get_best_hyperparameters
-from utils import augmented_and_regularized_trimmed_loss
+from .utils import RegNet, get_best_hyperparameters
+from .utils import augmented_and_regularized_trimmed_loss
+
 
 class LaplacePosterior(Posterior):
     def __init__(self, posterior, output_dim):

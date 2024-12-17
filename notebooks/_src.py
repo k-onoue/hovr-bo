@@ -10,9 +10,9 @@ RESULTS_DIR = config["paths"]["results_dir"]
 sys.path.append(PROJECT_DIR)
 
 from laplace_bnn import LaplaceBNN
-from src.test_function import SyntheticSine, BraninFoo
+from test_functions import SyntheticSine, BraninFoo
 from sampler_wrapper import IndependentSampler, RelativeSampler
-from sampler_wrapper import laplace_sampler
+from samplers import laplace_sampler
 
 
 __all__ = [

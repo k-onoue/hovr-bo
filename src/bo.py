@@ -7,7 +7,7 @@ from plotly.subplots import make_subplots
 from tabulate import tabulate
 import torch
 
-from sampler_wrapper import IndependentSampler, RelativeSampler
+from .sampler_wrapper import IndependentSampler, RelativeSampler
 
 
 class BayesianOptimization:
@@ -217,36 +217,12 @@ class BayesianOptimization:
             height=600, 
             width=1400, 
             title_text="Optimization Results",
-            xaxis_title="Iteration",
             yaxis_title="Objective Value"
         )
 
+        # Adjust axes titles for individual subplots
+        fig.update_xaxes(title_text="Iteration", row=1, col=1)
+        fig.update_xaxes(title_text="Iteration", row=1, col=2)
+
         fig.show()
 
-
-if __name__ == "__main__":
-    from test_function import SyntheticSine
-    from sampler import laplace_sampler
-
-    noise_std = 2
-    outlier_prob = 0.05
-    outlier_scale = 30
-    objective_function = SyntheticSine(
-        noise_std=noise_std,
-        outlier_prob=outlier_prob,
-        outlier_scale=outlier_scale
-    )
-
-    bo = BayesianOptimization(
-        objective_function=objective_function,
-        sampler=laplace_sampler,
-        n_initial_eval=5,
-        n_iter=10,
-        batch_size=2,
-        is_maximize=False,
-        device=torch.device("cpu"),
-        dtype=torch.float64,
-    )
-
-    bo.run()
-    bo.report()
