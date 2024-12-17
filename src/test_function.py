@@ -95,7 +95,7 @@ class SyntheticSine(OutlierTestProblem):
             outlier_scale: Magnitude scale of the outliers.
         """
         self.dim = 1  # 1D function
-        self._bounds = [(5.0, 10.0)]  # Domain bounds
+        self._bounds = [(5.0, 10.0)] # Domain bounds: [(x_i min, x_i max),]
         super().__init__(
             noise_std=noise_std, 
             negate=negate, 
@@ -122,7 +122,8 @@ class SyntheticSine(OutlierTestProblem):
         term2 = torch.sin(3 * X + 5 / X + 1)  # sin(3x + 5/x + 1)
         result = - term1 * term2
         
-        return result.squeeze(-1)
+        # return result.squeeze(-1)
+        return result
 
 
 class BraninFoo(OutlierTestProblem):
@@ -150,7 +151,7 @@ class BraninFoo(OutlierTestProblem):
             outlier_scale: Magnitude scale of the outliers.
         """
         self.dim = 2  # 2D function
-        self._bounds = [(0.0, 15.0), (-5.0, 15.0)]  # Domain bounds
+        self._bounds = [(0.0, 15.0), (-5.0, 15.0)] # Domain bounds: [(x_i min, x_i max),]
         super().__init__(
             noise_std=noise_std, 
             negate=negate, 
@@ -175,7 +176,8 @@ class BraninFoo(OutlierTestProblem):
         term2 = 10 * (1 - 1 / (8 * torch.pi)) * torch.cos(x1)
         result = term1**2 + term2 + 10
         
-        return result
+        # return result
+        return result.unsqueeze(-1)
 
 
 # if __name__ == "__main__":
