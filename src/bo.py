@@ -15,15 +15,18 @@ class BayesianOptimization:
         self,
         objective_function: Callable,
         sampler: Callable,
+        acqf: Callable,
         n_initial_eval: int = 5,
         n_iter: int = 30,
         batch_size: int = 1,
         is_maximize: bool = False,
         device: torch.device = torch.device("cpu"),
         dtype: torch.dtype = torch.float64,
+        sampler_args: Optional[dict] = None,
     ):
         self.objective_function = objective_function
         self.sampler = sampler
+        self.acqf = acqf
         self.device = device
         self.dtype = dtype
 
@@ -42,6 +45,7 @@ class BayesianOptimization:
         )
 
         self.sampler = sampler
+        self.sampler_args = sampler_args or {}
 
         self.history_df = None
 
@@ -69,10 +73,12 @@ class BayesianOptimization:
                 train_X=X,
                 train_Y=Y if self.is_maximize else -Y,
                 sampler=self.sampler,
+                acqf=self.acqf,
                 bounds=self.bounds,
                 batch_size=self.batch_size,
                 dtype=self.dtype,
                 device=self.device,
+                **self.sampler_args,
             )
 
             candidates = relative_sampler.sample()

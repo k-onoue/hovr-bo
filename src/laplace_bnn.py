@@ -72,7 +72,7 @@ class LaplaceBNN(Model):
         self.regnet_activation = args.get("regnet_activation", "tanh")
         self.prior_var = args.get("prior_var", 1.0)
         self.noise_var = args.get("noise_var", 1.0)
-        self.iterative = args.get("iterative", False)
+        self.iterative = args.get("iterative", True)
         self.loss_params = args.get("loss_params", {})
         self.nn = RegNet(
             dimensions=self.regnet_dims,
@@ -198,7 +198,9 @@ class LaplaceBNN(Model):
         # M = loss_params.get("M", 100)  # Number of random points for HOVR
 
         n_epochs = self.loss_params.get("n_epochs", 1000)
+        lr = self.loss_params.get("lr", 1e-2)
         weight_decay = self.loss_params.get("weight_decay", 0)
+        momentum = self.loss_params.get("momentum", 0)
         artl_weight = self.loss_params.get("artl_weight", 1.0)  # Weight for ARTL loss
         h = self.loss_params.get("h", int(0.9 * len(train_x)))
         lambd = self.loss_params.get("lambd", 1e-3)
@@ -207,17 +209,18 @@ class LaplaceBNN(Model):
         M = self.loss_params.get("M", 100)
 
         # optimizer = torch.optim.Adam(self.nn.parameters(), lr=1e-1, weight_decay=1e-3)
-        optimizer = torch.optim.Adam(self.nn.parameters(), lr=1e-2, weight_decay=weight_decay)
+        # optimizer = torch.optim.Adam(self.nn.parameters(), lr=lr, weight_decay=weight_decay)
+        optimizer = torch.optim.SGD(self.nn.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs * len(train_loader))
 
-        print(f"n_epochs: {n_epochs}")
-        print(f"weight_decay: {weight_decay}")
-        print(f"artl_weight: {artl_weight}")
-        print(f"h: {h}")
-        print(f"lambd: {lambd}")
-        print(f"k: {k}")
-        print(f"q: {q}")
-        print(f"M: {M}")
+        # print(f"n_epochs: {n_epochs}")
+        # print(f"weight_decay: {weight_decay}")
+        # print(f"artl_weight: {artl_weight}")
+        # print(f"h: {h}")
+        # print(f"lambd: {lambd}")
+        # print(f"k: {k}")
+        # print(f"q: {q}")
+        # print(f"M: {M}")
 
         mse_loss_func = torch.nn.MSELoss()
 
@@ -250,6 +253,11 @@ class LaplaceBNN(Model):
                 total_loss.backward()
                 optimizer.step()
                 scheduler.step()
+
+            mse_loss = mse_loss.item()
+            artl_loss = artl_loss.item() if type(artl_loss) != int else artl_loss
+
+            print(f"Epoch {epoch+1}/{n_epochs}: MSE Loss: {mse_loss}, ARTL Loss: {artl_loss}")
 
         self.nn.eval()
 

@@ -53,6 +53,7 @@ class RelativeSampler(Sampler):
         train_X: torch.Tensor,
         train_Y: torch.Tensor,
         sampler: Callable,
+        acqf: Callable,
         bounds: torch.Tensor,
         batch_size: int = 1, 
         dtype: torch.dtype = None,
@@ -78,11 +79,13 @@ class RelativeSampler(Sampler):
         self.sampler = sampler
         self.sampler_kwargs = kwargs
 
+        self.acqf = acqf
 
-        print(f"train_X: {train_X}")
-        print(f"train_Y: {train_Y}")
-        print(f"self.train_X: {self.train_X}")
-        print(f"self.train_Y: {self.train_Y}")
+
+        # print(f"train_X: {train_X}")
+        # print(f"train_Y: {train_Y}")
+        # print(f"self.train_X: {self.train_X}")
+        # print(f"self.train_Y: {self.train_Y}")
 
     
     def sample(self) -> torch.Tensor:
@@ -97,6 +100,7 @@ class RelativeSampler(Sampler):
             train_Y=self.train_Y,
             bounds=normalized_bounds,
             batch_size=self.batch_size,
+            mc_acqf=self.acqf,
             dtype=self.dtype,
             device=self.device,
             **self.sampler_kwargs
