@@ -22,8 +22,12 @@ class BayesianOptimization:
         is_maximize: bool = False,
         device: torch.device = torch.device("cpu"),
         dtype: torch.dtype = torch.float64,
+        seed: int = None,
         sampler_args: Optional[dict] = None,
     ):
+        self.seed = seed
+        self._set_seed()
+
         self.objective_function = objective_function
         self.sampler = sampler
         self.acqf = acqf
@@ -47,31 +51,45 @@ class BayesianOptimization:
         self.sampler = sampler
         self.sampler_args = sampler_args or {}
 
+        # Initialize cumulative data storage
+        self.X_all = None
+        self.Y_all = None
+        self.F_all = None
+
         self.history_df = None
 
-    def _evaluate(self, X):
-        Y = self.objective_function(X)
-        F = self.objective_function.evaluate_true(X)
+    def _set_seed(self):
+        seed = self.seed if self.seed else 42
+        torch.manual_seed(seed)
+        np.random.seed(seed)
 
-        if self.is_maximize:
-            y_best = Y.max()
-            f_best = F.max()
-        else:
-            y_best = Y.min()
-            f_best = F.min()
-
-        return Y, F, y_best, f_best
+    def _evaluate(self, X_new: torch.Tensor):
+        """
+        Evaluate the new candidate points only.
+        Returns Y_new, F_new for these new points.
+        """
+        Y_new = self.objective_function(X_new)
+        F_new = self.objective_function.evaluate_true(X_new)
+        return Y_new, F_new
 
     def run(self):
-        X = self.indenpendent_sampler.sample()
-        Y, F, y_best, f_best = self._evaluate(X)
+        # Initial sampling
+        X_init = self.indenpendent_sampler.sample()
+        Y_init, F_init = self._evaluate(X_init)
 
-        self._record(X, Y, F, y_best, f_best, "independent")
+        # Initialize cumulative arrays
+        self.X_all = X_init
+        self.Y_all = Y_init
+        self.F_all = F_init
 
+        # Record initial data
+        self._record("independent")
+
+        # Main optimization loop
         for iter in range(self.n_iter):
             relative_sampler = RelativeSampler(
-                train_X=X,
-                train_Y=Y if self.is_maximize else -Y,
+                train_X=self.X_all,
+                train_Y=self.Y_all if self.is_maximize else -self.Y_all,
                 sampler=self.sampler,
                 acqf=self.acqf,
                 bounds=self.bounds,
@@ -81,25 +99,25 @@ class BayesianOptimization:
                 **self.sampler_args,
             )
 
+            # Sample new candidates
             candidates = relative_sampler.sample()
-            X = torch.cat([X, candidates], dim=0)
-            Y, F, y_best, f_best = self._evaluate(X)
 
-            self._record(X, Y, F, y_best, f_best, "relative")
+            # Evaluate only the newly sampled points
+            Y_new, F_new = self._evaluate(candidates)
+
+            # Update the cumulative arrays
+            self.X_all = torch.cat([self.X_all, candidates], dim=0)
+            self.Y_all = torch.cat([self.Y_all, Y_new], dim=0)
+            self.F_all = torch.cat([self.F_all, F_new], dim=0)
+
+            # Record the new data
+            self._record("relative")
 
             print(f"Iteration {iter+1}/{self.n_iter} completed.")
 
         print("Optimization completed.")
 
-    def _record(
-            self, 
-            X, 
-            Y, 
-            F, 
-            y_best,
-            f_best,
-            sampler_name: str
-        ):
+    def _record(self, sampler_name: str):
         """
         Record the optimization history.
 
@@ -111,9 +129,16 @@ class BayesianOptimization:
         - Best objective value without noise so far (f_best)
         - Sampler name (e.g., independent or relative)
         """
-        # Ensure Y and F are 2D tensors
-        Y = Y.unsqueeze(-1) if Y.dim() == 1 else Y
-        F = F.unsqueeze(-1) if F.dim() == 1 else F
+        X = self.X_all
+        Y = self.Y_all.unsqueeze(-1) if self.Y_all.dim() == 1 else self.Y_all
+        F = self.F_all.unsqueeze(-1) if self.F_all.dim() == 1 else self.F_all
+
+        if self.is_maximize:
+            y_best = Y.max()
+            f_best = F.max()
+        else:
+            y_best = Y.min()
+            f_best = F.min()
 
         # Convert to CPU for compatibility with Pandas
         X_np = X.cpu().numpy()

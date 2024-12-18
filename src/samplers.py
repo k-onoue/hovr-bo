@@ -62,11 +62,6 @@ from .laplace_bnn import LaplaceBNN
 #     return candidates
 
 import plotly.graph_objects as go
-import torch
-from botorch.acquisition.logei import qLogExpectedImprovement
-from botorch.optim import optimize_acqf
-from botorch.sampling import SobolQMCNormalSampler
-from typing import Callable
 
 def laplace_sampler(
     train_X: torch.Tensor,
@@ -120,7 +115,7 @@ def laplace_sampler(
 
     # Visualization
     if plot and input_dim == 1:
-        test_X = torch.linspace(bounds[0, 0], bounds[1, 0], steps=100).to(device, dtype)
+        test_X = torch.linspace(bounds[0, 0], bounds[1, 0], steps=500).to(device, dtype)
         posterior = surrogate_model.posterior(test_X.unsqueeze(-1))
         pred_mean = posterior.mean.detach().cpu().numpy().flatten()
         pred_std = torch.sqrt(posterior.variance).detach().cpu().numpy().flatten()

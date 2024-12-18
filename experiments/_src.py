@@ -12,6 +12,7 @@ sys.path.append(PROJECT_DIR)
 from src.bo import BayesianOptimization
 from src.samplers import gp_sampler, laplace_sampler
 from src.test_functions import SyntheticSine, BraninFoo
+from src.utils import set_logger
 
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     "gp_sampler",
     "laplace_sampler",    
     "SyntheticSine",
-    "BraninFoo"
+    "BraninFoo",
+    "set_logger",
 ]

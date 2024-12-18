@@ -9,8 +9,8 @@ from gpytorch import distributions as gdists
 from laplace import Laplace
 from torch import Tensor
 
-from .utils import RegNet, get_best_hyperparameters
-from .utils import augmented_and_regularized_trimmed_loss
+from .nn_utils import RegNet, get_best_hyperparameters
+from .nn_utils import augmented_and_regularized_trimmed_loss
 
 
 class LaplacePosterior(Posterior):
@@ -68,7 +68,7 @@ class LaplaceBNN(Model):
         # self.noise_var = args["noise_var"] if "noise_var" in args else torch.tensor(1.0)
         # self.iterative = args["iterative"] if "iterative" in args else False
         self.likelihood = "regression"
-        self.regnet_dims = args.get("regnet_dims", [256, 256, 256])
+        self.regnet_dims = args.get("regnet_dims", [128, 128, 128])
         self.regnet_activation = args.get("regnet_activation", "tanh")
         self.prior_var = args.get("prior_var", 1.0)
         self.noise_var = args.get("noise_var", 1.0)
@@ -197,16 +197,27 @@ class LaplaceBNN(Model):
         # q = loss_params.get("q", 2)  # Exponent in HOVR
         # M = loss_params.get("M", 100)  # Number of random points for HOVR
 
+        # n_epochs = self.loss_params.get("n_epochs", 1000)
+        # lr = self.loss_params.get("lr", 1e-2)
+        # weight_decay = self.loss_params.get("weight_decay", 0)
+        # momentum = self.loss_params.get("momentum", 0)
+        # artl_weight = self.loss_params.get("artl_weight", 1.0)  # Weight for ARTL loss
+        # h = self.loss_params.get("h", int(0.9 * len(train_x)))
+        # lambd = self.loss_params.get("lambd", 1e-3)
+        # k = self.loss_params.get("k", (1, 2, 3))
+        # q = self.loss_params.get("q", 2)
+        # M = self.loss_params.get("M", 100)
+
         n_epochs = self.loss_params.get("n_epochs", 1000)
         lr = self.loss_params.get("lr", 1e-2)
         weight_decay = self.loss_params.get("weight_decay", 0)
         momentum = self.loss_params.get("momentum", 0)
-        artl_weight = self.loss_params.get("artl_weight", 1.0)  # Weight for ARTL loss
+        artl_weight = self.loss_params.get("artl_weight", 0)  # Weight for ARTL loss
         h = self.loss_params.get("h", int(0.9 * len(train_x)))
         lambd = self.loss_params.get("lambd", 1e-3)
         k = self.loss_params.get("k", (1, 2, 3))
         q = self.loss_params.get("q", 2)
-        M = self.loss_params.get("M", 100)
+        M = self.loss_params.get("M", 10)
 
         # optimizer = torch.optim.Adam(self.nn.parameters(), lr=1e-1, weight_decay=1e-3)
         # optimizer = torch.optim.Adam(self.nn.parameters(), lr=lr, weight_decay=weight_decay)
