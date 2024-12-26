@@ -178,6 +178,181 @@ class BraninFoo(OutlierTestProblem):
         
         # return result
         return result.unsqueeze(-1)
+    
+
+class Ackley2d(OutlierTestProblem):
+    r"""
+    Ackley function in 2D with outliers:
+        f(x_1, x_2) = -20 * exp(-0.2 * sqrt(0.5 * (x_1^2 + x_2^2))) 
+                      - exp(0.5 * (cos(2*pi*x_1) + cos(2*pi*x_2))) + 20 + e,
+        where x_1, x_2 ∈ [-5, 5].
+    """
+
+    def __init__(
+        self, 
+        noise_std: Optional[float] = None, 
+        negate: bool = False,
+        outlier_prob: Optional[float] = None,
+        outlier_scale: float = 5.0,
+        outlier_std: float = 1.0,
+    ):
+        r"""
+        Args:
+            noise_std: Standard deviation of the observation noise.
+            negate: If True, negate the function.
+            outlier_prob: Probability of an outlier occurring for each function evaluation. 
+                          If None, no outliers will be added.
+            outlier_scale: Magnitude scale of the outliers.
+        """
+        self.dim = 2  # 2D function
+        self._bounds = [(-5.0, 5.0), (-5.0, 5.0)] # Domain bounds: [(x_i min, x_i max),]
+        super().__init__(
+            noise_std=noise_std, 
+            negate=negate, 
+            outlier_prob=outlier_prob, 
+            outlier_scale=outlier_scale,
+            outlier_std=outlier_std
+        )
+    
+    def evaluate_true(self, X: Tensor) -> Tensor:
+        r"""
+        Compute the true function value.
+
+        Args:
+            X: A (batch_shape) x 2 tensor of input points.
+
+        Returns:
+            A tensor of function evaluations.
+        """
+        x1 = X[..., 0]
+        x2 = X[..., 1]
+        term1 = -20 * torch.exp(-0.2 * torch.sqrt(0.5 * (x1**2 + x2**2)))
+        term2 = -torch.exp(0.5 * (torch.cos(2 * torch.pi * x1) + torch.cos(2 * torch.pi * x2)))
+        result = term1 + term2 + 20 + torch.exp(torch.tensor(1.0, device=X.device, dtype=X.dtype))
+        
+        # return result
+        return result.unsqueeze(-1)
+    
+
+class Ackley5d(OutlierTestProblem):
+    r"""
+    Ackley function in 5D with outliers:
+        f(x_1, x_2, x_3, x_4, x_5) = -20 * exp(-0.2 * sqrt(0.5 * (x_1^2 + x_2^2 + x_3^2 + x_4^2 + x_5^2))) 
+                                      - exp(0.5 * (cos(2*pi*x_1) + cos(2*pi*x_2) + cos(2*pi*x_3) + cos(2*pi*x_4) + cos(2*pi*x_5))) + 20 + e,
+        where x_1, x_2, x_3, x_4, x_5 ∈ [-5, 5].
+    """
+
+    def __init__(
+        self, 
+        noise_std: Optional[float] = None, 
+        negate: bool = False,
+        outlier_prob: Optional[float] = None,
+        outlier_scale: float = 5.0,
+        outlier_std: float = 1.0,
+    ):
+        r"""
+        Args:
+            noise_std: Standard deviation of the observation noise.
+            negate: If True, negate the function.
+            outlier_prob: Probability of an outlier occurring for each function evaluation. 
+                          If None, no outliers will be added.
+            outlier_scale: Magnitude scale of the outliers.
+        """
+        self.dim = 5  # 5D function
+        self._bounds = [(-5.0, 5.0)] * 5 # Domain bounds: [(x_i min, x_i max),]
+        super().__init__(
+            noise_std=noise_std, 
+            negate=negate, 
+            outlier_prob=outlier_prob, 
+            outlier_scale=outlier_scale,
+            outlier_std=outlier_std
+        )
+    
+    def evaluate_true(self, X: Tensor) -> Tensor:
+        r"""
+        Compute the true function value.
+
+        Args:
+            X: A (batch_shape) x 5 tensor of input points.
+
+        Returns:
+            A tensor of function evaluations.
+        """
+        x1 = X[..., 0]
+        x2 = X[..., 1]
+        term1 = -20 * torch.exp(-0.2 * torch.sqrt(0.5 * (x1**2 + x2**2)))
+        term2 = -torch.exp(0.5 * (torch.cos(2 * torch.pi * x1) + torch.cos(2 * torch.pi * x2)))
+        result = term1 + term2 + 20 + torch.exp(torch.tensor(1.0, device=X.device, dtype=X.dtype))
+        
+        # return result
+        return result.unsqueeze(-1)
+    
+
+class Hartmann6d(OutlierTestProblem):
+    r"""
+    Hartmann function in 6D with outliers:
+        f(x_1, x_2, x_3, x_4, x_5, x_6) = -sum_{i=1}^4 a_i * exp(-sum_{j=1}^6 A_{ij} (x_j - P_{ij})^2),
+        where a = [1.0, 1.2, 3.0, 3.2], A = [[10, 3, 17, 3.5, 1.7, 8], [0.05, 10, 17, 0.1, 8, 14], [3, 3.5, 1.7, 10, 17, 8], [17, 8, 0.05, 10, 0.1, 14]],
+        P = [[0.1312, 0.1696, 0.5569, 0.0124, 0.8283, 0.5886], [0.2329, 0.4135, 0.8307, 0.3736, 0.1004, 0.9991], [0.2348, 0.1451, 0.3522, 0.2883, 0.3047, 0.6650], [0.4047, 0.8828, 0.8732, 0.5743, 0.1091, 0.0381]],
+        x_i ∈ [0, 1] for i = 1, 2, ..., 6.
+    """
+
+    def __init__(
+        self, 
+        noise_std: Optional[float] = None, 
+        negate: bool = False,
+        outlier_prob: Optional[float] = None,
+        outlier_scale: float = 5.0,
+        outlier_std: float = 1.0,
+    ):
+        r"""
+        Args:
+            noise_std: Standard deviation of the observation noise.
+            negate: If True, negate the function.
+            outlier_prob: Probability of an outlier occurring for each function evaluation. 
+                          If None, no outliers will be added.
+            outlier_scale: Magnitude scale of the outliers.
+        """
+    
+        self.dim = 6  # 6D function
+        self._bounds = [(0.0, 1.0)] * 6  # Domain bounds: [(x_i min, x_i max),]
+        super().__init__(
+            noise_std=noise_std, 
+            negate=negate, 
+            outlier_prob=outlier_prob, 
+            outlier_scale=outlier_scale,
+            outlier_std=outlier_std
+        )
+    
+    def evaluate_true(self, X: Tensor) -> Tensor:
+        r"""
+        Compute the true function value.
+
+        Args:
+            X: A (batch_shape) x 6 tensor of input points.
+
+        Returns:
+            A tensor of function evaluations.
+        """
+        a = torch.tensor([1.0, 1.2, 3.0, 3.2], device=X.device, dtype=X.dtype)
+        A = torch.tensor([
+            [10, 3, 17, 3.5, 1.7, 8], 
+            [0.05, 10, 17, 0.1, 8, 14], 
+            [3, 3.5, 1.7, 10, 17, 8], 
+            [17, 8, 0.05, 10, 0.1, 14]
+        ], device=X.device, dtype=X.dtype)
+        P = torch.tensor([
+            [0.1312, 0.1696, 0.5569, 0.0124, 0.8283, 0.5886], 
+            [0.2329, 0.4135, 0.8307, 0.3736, 0.1004, 0.9991], 
+            [0.2348, 0.1451, 0.3522, 0.2883, 0.3047, 0.6650], 
+            [0.4047, 0.8828, 0.8732, 0.5743, 0.1091, 0.0381]
+        ], device=X.device, dtype=X.dtype)
+        
+        result = -torch.sum(a * torch.exp(-torch.sum(A * (X.unsqueeze(-2) - P) ** 2, dim=-1)), dim=-1)
+        
+        # return result
+        return result.unsqueeze(-1)
+
 
 
 # if __name__ == "__main__":
