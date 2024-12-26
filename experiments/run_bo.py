@@ -1,15 +1,12 @@
 import argparse
+import json
 import os
 
 import torch
-from botorch.acquisition.logei import qLogExpectedImprovement
-from botorch.acquisition.logei import qLogNoisyExpectedImprovement
 
 from _src import BayesianOptimization
-from _src import gp_sampler, laplace_sampler
-from _src import SyntheticSine, BraninFoo
 from _src import set_logger
-
+from _src import get_objective_function, get_surrogate_model, get_acquisition_function
 
 
 class Experiment:
@@ -18,39 +15,40 @@ class Experiment:
 
     def _unpack_basic_settings(self):
         return (
-            self.settings["n_initial_eval"], 
-            self.settings["n_iter"], 
-            self.settings["batch_size"],
-            self.settings["is_maximize"],
-            self.settings["device"],
-            self.settings["dtype"],
-            self.settings.get("seed", None),
+            int(self.settings["n_initial_eval"]), 
+            int(self.settings["n_iter"]), 
+            int(self.settings["batch_size"]),
+            bool(self.settings["is_maximize"]),
+            torch.device(self.settings["device"]),
+            getattr(torch, self.settings["dtype"]),
+            int(self.settings.get("seed", 0)),
         )
     
     def _unpack_objective_settings(self):
+        obj_settings = self.settings["objective"]
         return (
-            self.settings["objective"]["function"],
-            self.settings["objective"]["noise_std"],
-            self.settings["objective"]["outlier_prob"],
-            self.settings["objective"]["outlier_scale"],
-            self.settings["objective"]["outlier_std"],
-        )
-    def _unpack_sampler_settings(self):
-        return (
-            self.settings["sampler"]["function"],
-            self.settings["sampler"]["acqf"],
-            self.settings["sampler"].get("sampler_args", None),
+            get_objective_function(obj_settings["function"]),
+            float(obj_settings["noise_std"]),
+            float(obj_settings["outlier_prob"]),
+            float(obj_settings["outlier_scale"]),
+            float(obj_settings["outlier_std"]),
         )
 
-    def run(self):
+    def _unpack_sampler_settings(self):
+        sampler_settings = self.settings["sampler"]
+        return (
+            get_surrogate_model(sampler_settings["function"]),
+            get_acquisition_function(sampler_settings["acqf"]),
+            sampler_settings.get("sampler_args", {}),
+        )
+
+    def run(self, save_dir: str):
         
         n_initial_eval, n_iter, batch_size, is_maximize, device, dtype, seed = self._unpack_basic_settings()
         objective_function, noise_std, outlier_prob, outlier_scale, outlier_std = self._unpack_objective_settings()
 
         sampler, acqf, sampler_args = self._unpack_sampler_settings()
 
-
-        
         objective_function = objective_function(
             noise_std=noise_std,
             outlier_prob=outlier_prob,
@@ -75,146 +73,51 @@ class Experiment:
         bo.run()
         bo.report()
 
+        _seed = seed
+        _obj = self.settings["objective"]["function"]
+        _sampler = self.settings["sampler"]["function"]
+        _acqf = self.settings["sampler"]["acqf"]
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Bayesian Optimization with BNNs")
-    # Basic parameters
-    parser.add_argument("--timestamp", type=str, help="Timestamp for the experiment")
-    parser.add_argument("--seed", type=int, default=0, help="Random seed")
-    parser.add_argument("--obj", type=str, default="synthetic", help="Objective function")
-  
-
-def get_objective_function(name):
-    if name == "synthetic":
-        return SyntheticSine
-    elif name == "branin":
-        return BraninFoo
-    else:
-        raise ValueError(f"Objective function {name} not recognized.")
+        filename = f"{_obj}_{_sampler}_{_acqf}_{_seed}.csv"
+        filename = os.path.join(save_dir, filename)
+        bo.history_df.to_csv(filename, index=False)
 
 
 if __name__ == "__main__":
-    base_script_name = os.path.splitext(__file__.split("/")[-1])[0]
-    args = parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--settings", type=str, required=True, help="Path to settings JSON file")
+    parser.add_argument("--timestamp", type=str, required=True, help="Timestamp for the experiment")
+    parser.add_argument("--seed", type=int, default=0, help="Seed for the experiment")
+    args = parser.parse_args()
 
-    timestamp = args.timestamp
-    results_dir = os.path.join("results", timestamp)
+    base_script_name = os.path.splitext(__file__.split("/")[-1])[0]
+    results_dir = os.path.join("results", args.timestamp)
     os.makedirs(results_dir, exist_ok=True)
 
-    log_filename_base = f"{base_script_name}_{args.obj}_{args.seed}"
+    set_logger(base_script_name, results_dir)
 
-    log_filepath = set_logger(log_filename_base, results_dir)
+    with open(args.settings, 'r') as f:
+        settings = json.load(f)
 
-    settings = {
-        "n_initial_eval": 10,
-        "n_iter": 10,
-        "batch_size": 10,
-        "is_maximize": False,
-        "device": torch.device("cpu"),
-        "dtype": torch.float64,
-        "objective": {
-            "name": "synthetic_sine",
-            "function": SyntheticSine,
-            "noise_std": 1.0,
-            "outlier_prob": 0.0,
-            "outlier_scale": 10,
-            "outlier_std": 1.0,
-        },
-        "sampler": {
-            "name": "laplace",
-            "function": laplace_sampler,
-            "acqf": qLogExpectedImprovement,
-            "sampler_args": {
-                "loss_params": {
-                    "n_epochs": 1000,
-                    "lr": 1e-2,
-                    "weight_decay": 0,
-                    "artl_weight": 1e-3,
-                    "lambd": 0,
-                    "k": (1, 2, 3),
-                    "q": 1,
-                    "M": 10,
-                },
-            },
-        }
-    }
-
+    settings["seed"] = args.seed
     experiment = Experiment(settings)
-    experiment.run()
+    experiment.run(results_dir)
 
 
-    # setting_list = [
 
-        # { # not good
-        #     "regnet_dims": [128, 128, 128],
-        #     "regnet_activation": "tanh",
-        #     "prior_var": 1.0,
-        #     "noise_var": 1.0,
-        #     "iterative": True,
-        #     "loss_params": {
-        #         "n_epochs": 1000,
-        #         "lr": 1e-2,
-        #         "weight_decay": 0,
-        #         "momentum": 0.9,
-        #         "artl_weight": 1,
-        #         "lambd": 1e-3,
-        #         "k": (1, 2, 3,),
-        #         "q": 1,
-        #         "M": 10,
+        # "sampler": {
+        #     "name": "llla_artl",
+        #     "acqf": "log_ei",
+        #     "sampler_args": {
+        #         "loss_params": {
+        #             "n_epochs": 1000,
+        #             "lr": 1e-2,
+        #             "weight_decay": 0,
+        #             "artl_weight": 1e-3,
+        #             "lambd": 0,
+        #             "k": (1, 2, 3),
+        #             "q": 1,
+        #             "M": 10,
+        #         },
         #     },
         # },
-        # { # good
-        #     "regnet_dims": [128, 128, 128],
-        #     "regnet_activation": "tanh",
-        #     "prior_var": 1.0,
-        #     "noise_var": 1.0,
-        #     "iterative": True,
-        #     "loss_params": {
-        #         "n_epochs": 1000,
-        #         "lr": 1e-2,
-        #         "weight_decay": 0,
-        #         "momentum": 0.9,
-        #         "artl_weight": 1e-3,
-        #         "lambd": 1e-3,
-        #         "k": (3,),
-        #         "q": 1,
-        #         "M": 10,
-        #     },
-        # },
-    #     { # no regularization
-    #         "regnet_dims": [128, 128, 128],
-    #         "regnet_activation": "tanh",
-    #         "prior_var": 1.0,
-    #         "noise_var": 1.0,
-    #         "iterative": True,
-    #         "loss_params": {
-    #             "n_epochs": 1000,
-    #             "lr": 1e-2,
-    #             "weight_decay": 0,
-    #             "momentum": 0.9,
-    #             "artl_weight": 0,
-    #             "lambd": 1e-3,
-    #             "k": (3,),
-    #             "q": 1,
-    #             "M": 10,
-    #         },
-    #     },
-    #     { # l2 regularization
-    #         "regnet_dims": [128, 128, 128],
-    #         "regnet_activation": "tanh",
-    #         "prior_var": 1.0,
-    #         "noise_var": 1.0,
-    #         "iterative": True,
-    #         "loss_params": {
-    #             "n_epochs": 1000,
-    #             "lr": 1e-2,
-    #             "weight_decay": 1e-3,
-    #             "momentum": 0.9,
-    #             "artl_weight": 0,
-    #             "lambd": 1e-3,
-    #             "k": (3,),
-    #             "q": 1,
-    #             "M": 10,
-    #         },
-    #     },
-    # ]

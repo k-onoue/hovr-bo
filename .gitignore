@@ -2,8 +2,7 @@ __pycache__
 build
 *.egg-info
 
-bnn_params
-experiment_results
+results
 
 .venv*
 .DS_Store

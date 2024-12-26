@@ -7,7 +7,7 @@ from botorch.optim import optimize_acqf
 from botorch.sampling import SobolQMCNormalSampler
 
 
-# -- Laplace BNN -------------------------------------------
+# -- LLLA -------------------------------------------
 from .laplace_bnn import LaplaceBNN
 
 
@@ -63,7 +63,7 @@ from .laplace_bnn import LaplaceBNN
 
 import plotly.graph_objects as go
 
-def laplace_sampler(
+def llla_artl_sampler(
     train_X: torch.Tensor,
     train_Y: torch.Tensor,
     bounds: torch.Tensor,
@@ -143,6 +143,15 @@ def laplace_sampler(
         fig.show()
 
     return candidates
+
+
+def llla_l2_sampler():
+    pass
+
+# -- VBLA ---------------------------------------------------
+
+def vbla_sampler():
+    pass
 
 
 # -- GP ---------------------------------------------------

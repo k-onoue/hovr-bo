@@ -10,16 +10,14 @@ RESULTS_DIR = config["paths"]["results_dir"]
 sys.path.append(PROJECT_DIR)
 
 from src.bo import BayesianOptimization
-from src.samplers import gp_sampler, laplace_sampler
-from src.test_functions import SyntheticSine, BraninFoo
-from src.utils import set_logger
+from src.utils_experiment import set_logger
+from src.utils_experiment import get_objective_function, get_surrogate_model, get_acquisition_function
 
 
 __all__ = [
     "BayesianOptimization",
-    "gp_sampler",
-    "laplace_sampler",    
-    "SyntheticSine",
-    "BraninFoo",
+    "get_objective_function",
+    "get_surrogate_model",
+    "get_acquisition_function",
     "set_logger",
 ]

@@ -1,0 +1,20 @@
+{
+    "device": "cpu",
+    "dtype": "float64",
+    "n_initial_eval": 1,
+    "n_iter": 40,
+    "batch_size": 1,
+    "is_maximize": false,
+    "objective": {
+        "function": "ackley2",
+        "noise_std": 1.0,
+        "outlier_prob": 0.0,
+        "outlier_scale": 10.0,
+        "outlier_std": 1.0
+    },
+    "sampler": {
+        "function": "gp",
+        "acqf": "log_ei",
+        "sampler_args": {}
+    }
+}

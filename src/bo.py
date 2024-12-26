@@ -1,3 +1,4 @@
+import logging
 from typing import Callable, Optional
 
 import numpy as np
@@ -113,9 +114,9 @@ class BayesianOptimization:
             # Record the new data
             self._record("relative")
 
-            print(f"Iteration {iter+1}/{self.n_iter} completed.")
+            logging.info(f"Iteration {iter+1}/{self.n_iter} completed.")
 
-        print("Optimization completed.")
+        logging.info("Optimization completed.")
 
     def _record(self, sampler_name: str):
         """
@@ -189,13 +190,13 @@ class BayesianOptimization:
 
     def report(self, max_rows: Optional[int] = None):
         if self.history_df is None:
-            print("No data to report.")
+            logging.info("No data to report.")
             return
 
         if max_rows is not None:
-            print(tabulate(self.history_df.head(max_rows), headers='keys', tablefmt='psql'))
+            logging.info(tabulate(self.history_df.head(max_rows), headers='keys', tablefmt='psql'))
         else:
-            print(tabulate(self.history_df, headers='keys', tablefmt='psql'))
+            logging.info(tabulate(self.history_df, headers='keys', tablefmt='psql'))
 
         # Plot Y and trueY as subplots with shared y-axis using plotly
         fig = make_subplots(rows=1, cols=2, shared_yaxes=True, subplot_titles=("Objective Values with Noise", "True Objective Values"))
