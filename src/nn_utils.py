@@ -18,6 +18,8 @@ class RegNet(torch.nn.Sequential):
                     self.add_module('tanh%d' % i, torch.nn.Tanh())
                 elif activation == "relu":
                     self.add_module('relu%d' % i, torch.nn.ReLU())
+                elif activation == "elu":
+                    self.add_module('elu%d' % i, torch.nn.ELU())
                 else:
                     raise NotImplementedError("Activation type %s is not supported" % activation)
                 
@@ -36,7 +38,6 @@ def get_best_hyperparameters(train_x, train_y, likelihood_fn):
         for noise_var in noise_var_values:
             # Calculate the log likelihood for the given hyperparameters
             likelihood = likelihood_fn(train_x, train_y, prior_var, noise_var)
-            
             # Check if this is the best likelihood encountered so far
             if likelihood > best_likelihood:
                 best_likelihood = likelihood
@@ -67,8 +68,10 @@ def augmented_and_regularized_trimmed_loss(
     - total_loss: Computed augmented trimmed loss.
     """
     # Default value for h if not provided
-    if h is None:
+    if h is None or h >= X_tensor.shape[0]:
         h = int(0.9 * X_tensor.shape[0])  # 90% of the data points
+
+    print(f"h: {h}, n: {X_tensor.shape[0]}")
 
     # TTL computation
     if lambd < 1:  # Compute TTL only if tradeoff is not 1

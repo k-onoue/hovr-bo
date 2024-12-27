@@ -21,7 +21,7 @@ def llla_artl_sampler(
     device: torch.device = torch.device("cpu"),
     dtype: torch.dtype = torch.float64,
     model_param_path: str = None,
-    plot: bool = False,
+    plot: bool = True,
     **kwargs
 ) -> torch.Tensor:
     r"""
@@ -40,15 +40,6 @@ def llla_artl_sampler(
     input_dim = train_X.shape[-1]
     output_dim = train_Y.shape[-1]
 
-    # Load model state if provided and the file exists
-    model_state = None
-    if model_param_path and os.path.isfile(model_param_path):
-        try:
-            model_state = torch.load(model_param_path)
-        except EOFError:
-            # File is empty or corrupted
-            model_state = None
-
     surrogate_model = LaplaceBNN(
         kwargs,
         input_dim=input_dim,
@@ -56,7 +47,7 @@ def llla_artl_sampler(
         device=device,
         dtype=dtype,
     )
-    surrogate_model.fit(train_X, train_Y, init_model_state=model_state)
+    surrogate_model.fit(train_X, train_Y, model_param_path=model_param_path)
 
     if model_param_path:
         # Save the model state
@@ -136,15 +127,6 @@ def llla_l2_sampler(
     input_dim = train_X.shape[-1]
     output_dim = train_Y.shape[-1]
 
-    # Load model state if provided and the file exists
-    model_state = None
-    if model_param_path and os.path.isfile(model_param_path):
-        try:
-            model_state = torch.load(model_param_path)
-        except EOFError:
-            # File is empty or corrupted
-            model_state = None
-
     surrogate_model = LaplaceBNN(
         kwargs,
         input_dim=input_dim,
@@ -152,7 +134,7 @@ def llla_l2_sampler(
         device=device,
         dtype=dtype,
     )
-    surrogate_model.fit(train_X, train_Y, init_model_state=model_state)
+    surrogate_model.fit(train_X, train_Y, model_param_path=model_param_path)
 
     if model_param_path:
         # Save the model state

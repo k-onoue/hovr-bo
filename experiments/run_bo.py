@@ -16,6 +16,7 @@ class Experiment:
     def _unpack_basic_settings(self):
         return (
             int(self.settings["n_initial_eval"]), 
+            self.settings["initial_sample_method"],
             int(self.settings["n_iter"]), 
             int(self.settings["batch_size"]),
             bool(self.settings["is_maximize"]),
@@ -44,7 +45,7 @@ class Experiment:
 
     def run(self, save_dir: str):
         
-        n_initial_eval, n_iter, batch_size, is_maximize, device, dtype, seed = self._unpack_basic_settings()
+        n_initial_eval, initial_sample_method, n_iter, batch_size, is_maximize, device, dtype, seed = self._unpack_basic_settings()
         objective_function, noise_std, outlier_prob, outlier_scale, outlier_std = self._unpack_objective_settings()
 
         sampler, acqf, sampler_args = self._unpack_sampler_settings()
@@ -60,6 +61,7 @@ class Experiment:
             objective_function=objective_function,
             sampler=sampler,
             n_initial_eval=n_initial_eval,
+            initial_sample_method=initial_sample_method,
             n_iter=n_iter,
             batch_size=batch_size,
             is_maximize=is_maximize,

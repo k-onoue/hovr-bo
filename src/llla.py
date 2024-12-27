@@ -1,3 +1,4 @@
+import os
 from typing import Any, Callable, List, Optional
 
 import numpy as np
@@ -63,12 +64,6 @@ class LaplaceBNN(Model):
         dtype: torch.dtype = torch.float64
     ):
         super().__init__()
-
-        # self.regnet_dims = args["regnet_dims"]
-        # self.regnet_activation = args["regnet_activation"]
-        # self.prior_var = args["prior_var"] if "prior_var" in args else 1.0
-        # self.noise_var = args["noise_var"] if "noise_var" in args else torch.tensor(1.0)
-        # self.iterative = args["iterative"] if "iterative" in args else False
         self.likelihood = "regression"
         self.regnet_dims = args.get("regnet_dims", [128, 128, 128])
         self.regnet_activation = args.get("regnet_activation", "tanh")
@@ -94,28 +89,28 @@ class LaplaceBNN(Model):
         else:
             # Transform to `(batch_shape*q, d)`
             B, Q, D = X.shape
-            X = X.reshape(B*Q, D)
+            X = X.reshape(B * Q, D)
 
         K = self.num_outputs
         # Posterior predictive distribution
-        # mean_y is (batch_shape*q, k); cov_y is (batch_shape*q*k, batch_shape*q*k)
         mean_y, cov_y = self._get_prediction(X, bnn)
 
-        # Mean in `(batch_shape, q*k)`
-        mean_y = mean_y.reshape(B, Q*K)
+        # Reshape mean
+        mean_y = mean_y.reshape(B, Q * K)
 
-        # Cov is `(batch_shape, q*k, q*k)`
-        cov_y += 1e-4*torch.eye(B*Q*K).to(X)
+        # Reshape covariance
+        cov_y += 1e-4 * torch.eye(B * Q * K).to(X)
         cov_y = cov_y.reshape(B, Q, K, B, Q, K)
         cov_y = torch.einsum('bqkbrl->bqkrl', cov_y)  # (B, Q, K, Q, K)
-        cov_y = cov_y.reshape(B, Q*K, Q*K)
+        cov_y = cov_y.reshape(B, Q * K, Q * K)
 
         dist = gdists.MultivariateNormal(mean_y, covariance_matrix=cov_y)
         post_pred = GPyTorchPosterior(dist)
 
+        # Return a custom LaplacePosterior if multiple outputs in a batched scenario
         if K > 1 and Q > 1:
             return LaplacePosterior(post_pred, self.output_dim)
-        else:        
+        else:
             return post_pred
 
     def posterior(
@@ -140,10 +135,11 @@ class LaplaceBNN(Model):
             test_x: Tensor of size `(batch_shape, d)`.
 
         Returns:
-            Tensor of size `(batch_shape, k)`
+            Tuple of (mean, cov) with shapes:
+            - mean: `(batch_shape, k)`
+            - cov: `(batch_shape*k, batch_shape*k)`
         """
         mean_y, cov_y = bnn(test_x, joint=True)
-
         return mean_y, cov_y
     
     def get_likelihood(self, train_x, train_y, prior_var, noise_var):
@@ -154,26 +150,30 @@ class LaplaceBNN(Model):
         train_y, val_y = train_y[:n_train], train_y[n_train:]
         train_loader = torch.utils.data.DataLoader(
             torch.utils.data.TensorDataset(train_x, train_y),
+            batch_size=min(32, len(train_x)),  # smaller batch size
+            shuffle=True
         )
 
         model = self.fit_laplace(train_loader, prior_var, noise_var)
         posterior = self.posterior_predictive(val_x, model)
     
         predictions_mean = posterior.mean
-        # std combines epistemic and aleatoric uncertainty
         predictions_std = torch.sqrt(posterior.variance + self.noise_var)
         # get log likelihood
         likelihood = torch.distributions.Normal(predictions_mean, predictions_std).log_prob(val_y).sum()
         return likelihood
 
     def fit_laplace(self, train_loader, prior_var, noise_var):
+        """
+        Fit a Laplace approximation on the last layer of the neural network.
+        """
         bnn = Laplace(
             self.nn, 
             self.likelihood,
             sigma_noise=np.sqrt(noise_var),
             prior_precision=(1 / prior_var),
             subset_of_weights='last_layer',
-            hessian_structure='kron',
+            hessian_structure='full',
             enable_backprop=True
         )
         bnn.fit(train_loader)
@@ -181,11 +181,16 @@ class LaplaceBNN(Model):
 
         return bnn
 
-
-    def fit(self, train_x, original_train_y, init_model_state=None):
+    def fit(self, train_x, original_train_y, model_param_path=None):
+        """
+        Train the neural network (MSE + optional ARTL) and optionally fit Laplace approximation.
+        """
+        # Use a smaller batch_size to avoid training with the entire dataset at once
+        batch_size = min(32, len(train_x))
         train_loader = torch.utils.data.DataLoader(
             torch.utils.data.TensorDataset(train_x, original_train_y),
-            batch_size=len(train_x), shuffle=True
+            batch_size=batch_size,
+            shuffle=True
         )
 
         n_epochs = self.loss_params.get("n_epochs", 10000)
@@ -199,15 +204,25 @@ class LaplaceBNN(Model):
         q = self.loss_params.get("q", 2)
         M = self.loss_params.get("M", 10)
 
-        if init_model_state is not None:
-            self.nn.load_state_dict(self.best_model_state)
+        # Load model state if provided and the file exists
+        if model_param_path and os.path.isfile(model_param_path):
+            try:
+                model_state = torch.load(model_param_path, weights_only=True)
+                self.nn.load_state_dict(model_state)
+            except EOFError:
+                # File is empty or corrupted
+                model_state = None
 
-        optimizer = torch.optim.SGD(self.nn.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs * len(train_loader))
-
+        # Use a simple SGD without scheduling
+        optimizer = torch.optim.SGD(
+            self.nn.parameters(), 
+            lr=lr, 
+            weight_decay=weight_decay, 
+            momentum=momentum
+        )
         mse_loss_func = torch.nn.MSELoss()
 
-        early_stopping = EarlyStopping(patience=20, verbose=True)
+        early_stopping = EarlyStopping(patience=1000, verbose=True, path=model_param_path)
 
         for epoch in range(n_epochs):
             for x, y in train_loader:
@@ -216,9 +231,9 @@ class LaplaceBNN(Model):
                 # Compute MSE loss
                 mse_loss = mse_loss_func(self.nn(x), y)
 
+                # Compute ARTL loss if needed
                 if artl_weight != 0:
-                    # Compute augmented and regularized trimmed loss (ARTL)
-                    artl_loss = augmented_and_regularized_trimmed_loss(
+                    artl_loss_val = augmented_and_regularized_trimmed_loss(
                         model=self.nn,
                         X_tensor=x,
                         y_tensor=y,
@@ -229,35 +244,41 @@ class LaplaceBNN(Model):
                         M=M
                     )
                 else:
-                    artl_loss = 0
+                    artl_loss_val = 0
 
-                # Combine both losses with weights
-                total_loss = mse_loss + artl_weight * artl_loss
+                # Combine both losses
+                total_loss = mse_loss + artl_weight * artl_loss_val
 
-                # Backpropagation and optimization
+                # Backpropagation
                 total_loss.backward()
                 optimizer.step()
-                scheduler.step()
 
-            mse_loss = mse_loss.item()
-            artl_loss = artl_loss.item() if type(artl_loss) != int else artl_loss
+            # Logging
+            mse_loss_value = mse_loss.item()
+            artl_loss_value = (
+                artl_loss_val.item() if isinstance(artl_loss_val, torch.Tensor) else artl_loss_val
+            )
 
-            print(f"Epoch {epoch+1}/{n_epochs}: MSE Loss: {mse_loss}, ARTL Loss: {artl_loss}")
+            print(f"Epoch {epoch+1}/{n_epochs}: MSE Loss: {mse_loss_value}, ARTL Loss: {artl_loss_value}")
 
-            val_loss = total_loss.item()  # Validation loss is total loss
+            # Use training loss as "validation" loss for early stopping
+            # val_loss = total_loss.item()
+            val_loss = mse_loss_value
             early_stopping(val_loss, self.nn)
 
             if early_stopping.early_stop:
                 print("Early stopping triggered")
                 break
 
-        if early_stopping.best_model_state is not None:
-            self.nn.load_state_dict(early_stopping.best_model_state)
-
+        # Reload the best model weights
+        self.nn.load_state_dict(torch.load(model_param_path, weights_only=True))
         self.nn.eval()
 
+        # Fit Laplace approximation if iterative
         if self.iterative:
             llh_fn = self.get_likelihood
-            self.prior_var, self.noise_var = get_best_hyperparameters(train_x, original_train_y, llh_fn)
+            self.prior_var, self.noise_var = get_best_hyperparameters(
+                train_x, original_train_y, llh_fn
+            )
 
         self.bnn = self.fit_laplace(train_loader, self.prior_var, self.noise_var)

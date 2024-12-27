@@ -1,14 +1,15 @@
 {
     "device": "cpu",
     "dtype": "float64",
-    "n_initial_eval": 1,
-    "n_iter": 40,
+    "n_initial_eval": 3,
+    "initial_sample_method": "sobol", 
+    "n_iter": 10,
     "batch_size": 1,
     "is_maximize": false,
     "objective": {
-        "function": "ackley2",
+        "function": "synthetic",
         "noise_std": 1.0,
-        "outlier_prob": 0.0,
+        "outlier_prob": 0.1,
         "outlier_scale": 10.0,
         "outlier_std": 1.0
     },
@@ -16,15 +17,16 @@
         "function": "llla_artl",
         "acqf": "log_ei",
         "sampler_args": {
+            "regnet_activation": "tanh",
             "loss_params": {
-                "n_epochs": 1000,
+                "n_epochs": 10000,
                 "lr": 1e-2,
                 "weight_decay": 0,
-                "artl_weight": 1e-3,
-                "lambda": 1e-3,
+                "artl_weight": 1e-1,
+                "lambd": 0,
                 "k": [3],
-                "q": 1,
-                "M": 10
+                "q": 2,
+                "M": 2
             }
         }
     }

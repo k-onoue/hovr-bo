@@ -1,5 +1,5 @@
 import logging
-from typing import Callable, Optional
+from typing import Callable, Literal, Optional
 
 import numpy as np
 import pandas as pd
@@ -18,6 +18,7 @@ class BayesianOptimization:
         sampler: Callable,
         acqf: Callable,
         n_initial_eval: int = 5,
+        initial_sample_method: Literal["sobol", "random"] = "sobol",
         n_iter: int = 30,
         batch_size: int = 1,
         is_maximize: bool = False,
@@ -48,7 +49,7 @@ class BayesianOptimization:
         self.indenpendent_sampler = IndependentSampler(
             n_initial_eval=n_initial_eval,
             bounds=self.bounds,
-            sample_method="sobol",
+            sample_method=initial_sample_method,
             dtype=self.dtype,
             device=self.device,
         )
