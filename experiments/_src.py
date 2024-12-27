@@ -10,8 +10,8 @@ RESULTS_DIR = config["paths"]["results_dir"]
 sys.path.append(PROJECT_DIR)
 
 from src.bo import BayesianOptimization
-from src.utils_experiment import set_logger
-from src.utils_experiment import get_objective_function, get_surrogate_model, get_acquisition_function
+from src.experiment_utils import set_logger
+from src.experiment_utils import get_objective_function, get_surrogate_model, get_acquisition_function
 
 
 __all__ = [

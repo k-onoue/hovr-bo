@@ -45,7 +45,7 @@ class IndependentSampler(Sampler):
             raise ValueError(f"Unknown sample method: {self.sample_method}")
         
         return samples
-
+    
 
 class RelativeSampler(Sampler):
     def __init__(
@@ -58,36 +58,32 @@ class RelativeSampler(Sampler):
         batch_size: int = 1, 
         dtype: torch.dtype = None,
         device: torch.device = None,
+        model_param_path: Optional[str] = None,
         **kwargs
     ):
+        self.model_param_path = model_param_path
+
         self.bounds = bounds
         self.batch_size = batch_size
         self.dtype = dtype or bounds.dtype
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
+        self.sampler = sampler
+        self.sampler_kwargs = kwargs
+        self.acqf = acqf
+
+        self.saved_model_state = None
+
+        self.set_train_data(train_X, train_Y)
+
+    def set_train_data(self, train_X: torch.Tensor, train_Y: torch.Tensor):
         # Normalize inputs and standardize outputs
         self.train_X = normalize(
             train_X,
-            bounds=bounds
+            bounds=self.bounds
         )
         self.train_Y = standardize(train_Y)
-        
-        # Store statistics for inverse transform
-        self.Y_mean = self.train_Y.mean()
-        self.Y_std = self.train_Y.std()
 
-        self.sampler = sampler
-        self.sampler_kwargs = kwargs
-
-        self.acqf = acqf
-
-
-        # print(f"train_X: {train_X}")
-        # print(f"train_Y: {train_Y}")
-        # print(f"self.train_X: {self.train_X}")
-        # print(f"self.train_Y: {self.train_Y}")
-
-    
     def sample(self) -> torch.Tensor:
         # Sample in normalized space
         normalized_bounds = torch.stack([
@@ -103,6 +99,7 @@ class RelativeSampler(Sampler):
             mc_acqf=self.acqf,
             dtype=self.dtype,
             device=self.device,
+            model_param_path=self.model_param_path,
             **self.sampler_kwargs
         )
         
@@ -113,3 +110,4 @@ class RelativeSampler(Sampler):
         )
         
         return candidates
+

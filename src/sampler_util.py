@@ -3,7 +3,7 @@ from functools import wraps
 import plotly.graph_objects as go
 import torch
 
-from .laplace_bnn import LaplaceBNN
+from .llla import LaplaceBNN
 
 
 def plot_fit(func):

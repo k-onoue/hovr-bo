@@ -7,3 +7,5 @@ results
 .venv*
 .DS_Store
 pybnn
+
+notebooks

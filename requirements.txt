@@ -1,7 +1,9 @@
+absl-py==2.1.0
 alembic==1.13.1
 anyio==4.2.0
 anytree==2.12.1
 appnope==0.1.4
+argcomplete==3.5.2
 argon2-cffi==23.1.0
 argon2-cffi-bindings==21.2.0
 arrow==1.3.0
@@ -12,6 +14,7 @@ attrs==23.2.0
 Babel==2.14.0
 backpack-for-pytorch==1.7.1
 beautifulsoup4==4.12.3
+beautifultable==1.1.0
 black==24.8.0
 bleach==6.1.0
 botorch @ git+https://github.com/pytorch/botorch.git@509bccc2295cb4546b9decd8ba53375164f7111a
@@ -30,18 +33,23 @@ cycler==0.12.1
 debugpy==1.8.1
 decorator==5.1.1
 defusedxml==0.7.1
+dill==0.3.9
+early-stopping-pytorch==1.0.10
 einconv==0.1.0
 einops==0.8.0
 emcee==3.1.6
 exceptiongroup==1.2.2
 executing==2.0.1
+fannypack==0.0.25
 fastjsonschema==2.19.1
 filelock==3.16.0
 fonttools==4.49.0
 fqdn==1.5.1
 fsspec==2024.9.0
 gpytorch==1.13
+grpcio==1.68.1
 h11==0.14.0
+h5py==3.12.1
 httpcore==1.0.3
 httpx==0.26.0
 idna==3.6
@@ -77,6 +85,7 @@ laplace-torch==0.2.2.2
 lightning-utilities==0.11.9
 linear-operator==0.5.3
 Mako==1.3.2
+Markdown==3.7
 MarkupSafe==2.1.5
 matplotlib==3.8.3
 matplotlib-inline==0.1.6
@@ -106,6 +115,7 @@ platformdirs==4.2.0
 plotly==5.19.0
 prometheus_client==0.20.0
 prompt-toolkit==3.0.43
+protobuf==5.29.2
 psutil==5.9.8
 ptyprocess==0.7.0
 pure-eval==0.2.2
@@ -133,6 +143,7 @@ scikit-learn==1.4.1.post1
 scipy==1.12.0
 seaborn==0.13.2
 Send2Trash==1.8.2
+simple-term-menu==1.6.6
 six==1.16.0
 sniffio==1.3.0
 soupsieve==2.5
@@ -141,6 +152,9 @@ stack-data==0.6.3
 sympy==1.13.1
 tabulate==0.9.0
 tenacity==8.2.3
+tensorboard==2.18.0
+tensorboard-data-server==0.7.2
+termcolor==2.5.0
 terminado==0.18.0
 threadpoolctl==3.3.0
 tinycss2==1.2.1
@@ -158,8 +172,10 @@ tzdata==2024.1
 unfoldNd==0.2.2
 uri-template==1.3.0
 urllib3==2.2.0
+vbll==0.2.6
 wcwidth==0.2.13
 webcolors==1.13
 webencodings==0.5.1
 websocket-client==1.7.0
+Werkzeug==3.1.3
 widgetsnbextension==4.0.10

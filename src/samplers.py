@@ -1,3 +1,4 @@
+import os
 from typing import Callable
 
 import torch
@@ -8,60 +9,8 @@ from botorch.sampling import SobolQMCNormalSampler
 
 
 # -- LLLA -------------------------------------------
-from .laplace_bnn import LaplaceBNN
-
-
-# def laplace_sampler(
-#     train_X: torch.Tensor,
-#     train_Y: torch.Tensor,
-#     bounds: torch.Tensor,
-#     batch_size: int = 1,
-#     mc_acqf: Callable = qLogExpectedImprovement,
-#     device: torch.device = torch.device("cpu"),
-#     dtype: torch.dtype = torch.float64,
-#     **kwargs
-# ) -> torch.Tensor:
-#     r"""
-#     Sample candidates using the Laplace acquisition function.
-
-#     Args:
-#         train_X: A `n x d` tensor of training points.
-#         train_Y: A `n x 1` tensor of training targets.
-#         bounds: A `2 x d` tensor of lower and upper bounds for each dimension.
-#         batch_size: Number of candidates to sample.
-
-#     Returns:
-#         A `batch_size x d` tensor of candidate points.
-#     """
-#     input_dim = train_X.shape[-1]
-#     output_dim = train_Y.shape[-1]
-
-#     surrogate_model = LaplaceBNN(
-#         kwargs,
-#         input_dim=input_dim,
-#         output_dim=output_dim,
-#         device=device,
-#         dtype=dtype,
-#     )
-#     surrogate_model.fit(train_X, train_Y)
-
-#     acquisition_function = mc_acqf(
-#         model=surrogate_model,
-#         best_f=train_Y.max(),
-#         sampler=SobolQMCNormalSampler(sample_shape=torch.Size([500])),
-#     )
-
-#     candidates, _ = optimize_acqf(
-#         acq_function=acquisition_function,
-#         bounds=bounds,
-#         q=batch_size,
-#         num_restarts=10,
-#         raw_samples=50,
-#     )
-
-#     return candidates
-
 import plotly.graph_objects as go
+from .llla import LaplaceBNN
 
 def llla_artl_sampler(
     train_X: torch.Tensor,
@@ -71,7 +20,8 @@ def llla_artl_sampler(
     mc_acqf: Callable = qLogExpectedImprovement,
     device: torch.device = torch.device("cpu"),
     dtype: torch.dtype = torch.float64,
-    plot: bool = True,
+    model_param_path: str = None,
+    plot: bool = False,
     **kwargs
 ) -> torch.Tensor:
     r"""
@@ -90,6 +40,15 @@ def llla_artl_sampler(
     input_dim = train_X.shape[-1]
     output_dim = train_Y.shape[-1]
 
+    # Load model state if provided and the file exists
+    model_state = None
+    if model_param_path and os.path.isfile(model_param_path):
+        try:
+            model_state = torch.load(model_param_path)
+        except EOFError:
+            # File is empty or corrupted
+            model_state = None
+
     surrogate_model = LaplaceBNN(
         kwargs,
         input_dim=input_dim,
@@ -97,7 +56,11 @@ def llla_artl_sampler(
         device=device,
         dtype=dtype,
     )
-    surrogate_model.fit(train_X, train_Y)
+    surrogate_model.fit(train_X, train_Y, init_model_state=model_state)
+
+    if model_param_path:
+        # Save the model state
+        torch.save(surrogate_model.nn.state_dict(), model_param_path)
 
     acquisition_function = mc_acqf(
         model=surrogate_model,
@@ -145,11 +108,102 @@ def llla_artl_sampler(
     return candidates
 
 
-def llla_l2_sampler():
-    pass
+def llla_l2_sampler(
+    train_X: torch.Tensor,
+    train_Y: torch.Tensor,
+    bounds: torch.Tensor,
+    batch_size: int = 1,
+    mc_acqf: Callable = qLogExpectedImprovement,
+    device: torch.device = torch.device("cpu"),
+    dtype: torch.dtype = torch.float64,
+    model_param_path: str = None,
+    plot: bool = False,
+    **kwargs
+) -> torch.Tensor:
+    r"""
+    Sample candidates using the Laplace acquisition function.
+
+    Args:
+        train_X: A `n x d` tensor of training points.
+        train_Y: A `n x 1` tensor of training targets.
+        bounds: A `2 x d` tensor of lower and upper bounds for each dimension.
+        batch_size: Number of candidates to sample.
+        plot: Whether to visualize model fit and credible intervals (default: True).
+
+    Returns:
+        A `batch_size x d` tensor of candidate points.
+    """
+    input_dim = train_X.shape[-1]
+    output_dim = train_Y.shape[-1]
+
+    # Load model state if provided and the file exists
+    model_state = None
+    if model_param_path and os.path.isfile(model_param_path):
+        try:
+            model_state = torch.load(model_param_path)
+        except EOFError:
+            # File is empty or corrupted
+            model_state = None
+
+    surrogate_model = LaplaceBNN(
+        kwargs,
+        input_dim=input_dim,
+        output_dim=output_dim,
+        device=device,
+        dtype=dtype,
+    )
+    surrogate_model.fit(train_X, train_Y, init_model_state=model_state)
+
+    if model_param_path:
+        # Save the model state
+        torch.save(surrogate_model.nn.state_dict(), model_param_path)
+
+    acquisition_function = mc_acqf(
+        model=surrogate_model,
+        best_f=train_Y.max(),
+        sampler=SobolQMCNormalSampler(sample_shape=torch.Size([500])),
+    )
+
+    candidates, _ = optimize_acqf(
+        acq_function=acquisition_function,
+        bounds=bounds,
+        q=batch_size,
+        num_restarts=10,
+        raw_samples=50,
+    )
+
+    # Visualization
+    if plot and input_dim == 1:
+        test_X = torch.linspace(bounds[0, 0], bounds[1, 0], steps=500).to(device, dtype)
+        posterior = surrogate_model.posterior(test_X.unsqueeze(-1))
+        pred_mean = posterior.mean.detach().cpu().numpy().flatten()
+        pred_std = torch.sqrt(posterior.variance).detach().cpu().numpy().flatten()
+
+        # Compute credible intervals
+        lower_bound = pred_mean - 2 * pred_std
+        upper_bound = pred_mean + 2 * pred_std
+
+        # Convert data for plotting
+        train_X_np = train_X.cpu().numpy().flatten()
+        train_Y_np = train_Y.cpu().numpy().flatten()
+        test_X_np = test_X.cpu().numpy().flatten()
+
+        # Plot
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=train_X_np, y=train_Y_np, mode='markers', name='Training Data'))
+        fig.add_trace(go.Scatter(x=test_X_np, y=pred_mean, mode='lines', name='Prediction'))
+        fig.add_trace(go.Scatter(x=test_X_np, y=upper_bound, mode='lines', line=dict(dash='dot'), name='Upper CI'))
+        fig.add_trace(go.Scatter(x=test_X_np, y=lower_bound, mode='lines', line=dict(dash='dot'), name='Lower CI'))
+        fig.update_layout(
+            title="Laplace BNN Fit with Credible Intervals",
+            xaxis_title="Input X",
+            yaxis_title="Output Y",
+        )
+        fig.show()
+
+    return candidates
 
 # -- VBLA ---------------------------------------------------
-
 def vbla_sampler():
     pass
 
@@ -166,6 +220,7 @@ def gp_sampler(
     batch_size: int = 1,
     mc_acqf: Callable = qLogExpectedImprovement,
     device: torch.device = torch.device("cpu"),
+    model_param_path: str = None,
     dtype: torch.dtype = torch.float64,
 ) -> torch.Tensor:
     r"""

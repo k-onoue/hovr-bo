@@ -24,10 +24,14 @@ class BayesianOptimization:
         device: torch.device = torch.device("cpu"),
         dtype: torch.dtype = torch.float64,
         seed: int = None,
+        model_param_path_prefix: str = "./params/checkpoint",
         sampler_args: Optional[dict] = None,
     ):
         self.seed = seed
         self._set_seed()
+        self.model_param_path = self._set_model_param_path(
+            prefix=model_param_path_prefix
+        )
 
         self.objective_function = objective_function
         self.sampler = sampler
@@ -49,6 +53,8 @@ class BayesianOptimization:
             device=self.device,
         )
 
+        self.relative_sampler = None
+
         self.sampler = sampler
         self.sampler_args = sampler_args or {}
 
@@ -63,6 +69,12 @@ class BayesianOptimization:
         seed = self.seed if self.seed else 42
         torch.manual_seed(seed)
         np.random.seed(seed)
+
+    def _set_model_param_path(self, prefix: str = None):
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
+        prefix = prefix or "checkpoint"
+        return f"{prefix}_{timestamp}.pt"
 
     def _evaluate(self, X_new: torch.Tensor):
         """
@@ -88,20 +100,28 @@ class BayesianOptimization:
 
         # Main optimization loop
         for iter in range(self.n_iter):
-            relative_sampler = RelativeSampler(
-                train_X=self.X_all,
-                train_Y=self.Y_all if self.is_maximize else -self.Y_all,
-                sampler=self.sampler,
-                acqf=self.acqf,
-                bounds=self.bounds,
-                batch_size=self.batch_size,
-                dtype=self.dtype,
-                device=self.device,
-                **self.sampler_args,
-            )
+            
+            if self.relative_sampler is None:
+                self.relative_sampler = RelativeSampler(
+                    train_X=self.X_all,
+                    train_Y=self.Y_all if self.is_maximize else -self.Y_all,
+                    sampler=self.sampler,
+                    acqf=self.acqf,
+                    bounds=self.bounds,
+                    batch_size=self.batch_size,
+                    dtype=self.dtype,
+                    device=self.device,
+                    model_param_path=self.model_param_path,
+                    **self.sampler_args,
+                )
+            else:
+                self.relative_sampler.set_train_data(
+                    train_X=self.X_all, 
+                    train_Y=self.Y_all if self.is_maximize else -self.Y_all
+                )
 
             # Sample new candidates
-            candidates = relative_sampler.sample()
+            candidates = self.relative_sampler.sample()
 
             # Evaluate only the newly sampled points
             Y_new, F_new = self._evaluate(candidates)

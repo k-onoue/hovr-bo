@@ -11,6 +11,8 @@ from torch import Tensor
 
 from .nn_utils import RegNet, get_best_hyperparameters
 from .nn_utils import augmented_and_regularized_trimmed_loss
+# from .nn_utils import EarlyStopping
+from early_stopping_pytorch import EarlyStopping
 
 
 class LaplacePosterior(Posterior):
@@ -70,7 +72,7 @@ class LaplaceBNN(Model):
         self.likelihood = "regression"
         self.regnet_dims = args.get("regnet_dims", [128, 128, 128])
         self.regnet_activation = args.get("regnet_activation", "tanh")
-        self.prior_var = args.get("prior_var", 1.0)
+        self.prior_var = args.get("prior_var", 10.0)
         self.noise_var = args.get("noise_var", 1.0)
         self.iterative = args.get("iterative", True)
         self.loss_params = args.get("loss_params", {})
@@ -170,7 +172,7 @@ class LaplaceBNN(Model):
             self.likelihood,
             sigma_noise=np.sqrt(noise_var),
             prior_precision=(1 / prior_var),
-            subset_of_weights='all',
+            subset_of_weights='last_layer',
             hessian_structure='kron',
             enable_backprop=True
         )
@@ -179,36 +181,14 @@ class LaplaceBNN(Model):
 
         return bnn
 
-    def fit(self, train_x, original_train_y):
+
+    def fit(self, train_x, original_train_y, init_model_state=None):
         train_loader = torch.utils.data.DataLoader(
             torch.utils.data.TensorDataset(train_x, original_train_y),
             batch_size=len(train_x), shuffle=True
         )
 
-        # # Use loss_params with default values
-        # if loss_params is None:
-        #     loss_params = {}
-        # n_epochs = loss_params.get("n_epochs", 1000)
-        # weight_decay = loss_params.get("weight_decay", 0)
-        # artl_weight = loss_params.get("artl_weight", 1.0)  # Weight for ARTL loss
-        # h = loss_params.get("h", int(0.9 * len(train_x)))  # 90% of data points
-        # lambd = loss_params.get("lambd", 1e-3)  # Regularization strength
-        # k = loss_params.get("k", (1, 2, 3))  # Order of derivatives in HOVR
-        # q = loss_params.get("q", 2)  # Exponent in HOVR
-        # M = loss_params.get("M", 100)  # Number of random points for HOVR
-
-        # n_epochs = self.loss_params.get("n_epochs", 1000)
-        # lr = self.loss_params.get("lr", 1e-2)
-        # weight_decay = self.loss_params.get("weight_decay", 0)
-        # momentum = self.loss_params.get("momentum", 0)
-        # artl_weight = self.loss_params.get("artl_weight", 1.0)  # Weight for ARTL loss
-        # h = self.loss_params.get("h", int(0.9 * len(train_x)))
-        # lambd = self.loss_params.get("lambd", 1e-3)
-        # k = self.loss_params.get("k", (1, 2, 3))
-        # q = self.loss_params.get("q", 2)
-        # M = self.loss_params.get("M", 100)
-
-        n_epochs = self.loss_params.get("n_epochs", 1000)
+        n_epochs = self.loss_params.get("n_epochs", 10000)
         lr = self.loss_params.get("lr", 1e-2)
         weight_decay = self.loss_params.get("weight_decay", 0)
         momentum = self.loss_params.get("momentum", 0)
@@ -219,21 +199,15 @@ class LaplaceBNN(Model):
         q = self.loss_params.get("q", 2)
         M = self.loss_params.get("M", 10)
 
-        # optimizer = torch.optim.Adam(self.nn.parameters(), lr=1e-1, weight_decay=1e-3)
-        # optimizer = torch.optim.Adam(self.nn.parameters(), lr=lr, weight_decay=weight_decay)
+        if init_model_state is not None:
+            self.nn.load_state_dict(self.best_model_state)
+
         optimizer = torch.optim.SGD(self.nn.parameters(), lr=lr, weight_decay=weight_decay, momentum=momentum)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs * len(train_loader))
 
-        # print(f"n_epochs: {n_epochs}")
-        # print(f"weight_decay: {weight_decay}")
-        # print(f"artl_weight: {artl_weight}")
-        # print(f"h: {h}")
-        # print(f"lambd: {lambd}")
-        # print(f"k: {k}")
-        # print(f"q: {q}")
-        # print(f"M: {M}")
-
         mse_loss_func = torch.nn.MSELoss()
+
+        early_stopping = EarlyStopping(patience=20, verbose=True)
 
         for epoch in range(n_epochs):
             for x, y in train_loader:
@@ -269,6 +243,16 @@ class LaplaceBNN(Model):
             artl_loss = artl_loss.item() if type(artl_loss) != int else artl_loss
 
             print(f"Epoch {epoch+1}/{n_epochs}: MSE Loss: {mse_loss}, ARTL Loss: {artl_loss}")
+
+            val_loss = total_loss.item()  # Validation loss is total loss
+            early_stopping(val_loss, self.nn)
+
+            if early_stopping.early_stop:
+                print("Early stopping triggered")
+                break
+
+        if early_stopping.best_model_state is not None:
+            self.nn.load_state_dict(early_stopping.best_model_state)
 
         self.nn.eval()
 
