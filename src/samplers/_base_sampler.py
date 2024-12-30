@@ -64,12 +64,13 @@ class RelativeSampler(Sampler):
         self.train_X = None
         self.train_Y = None
 
-    def set_train_data(self, train_X: torch.Tensor, train_Y: torch.Tensor):
+    def set_train_data(
+        self, 
+        train_X: torch.Tensor, 
+        train_Y: torch.Tensor
+    ) -> None:
         # Normalize inputs and standardize outputs
-        self.train_X = normalize(
-            train_X,
-            bounds=self.bounds
-        )
+        self.train_X = normalize(train_X, bounds=self.bounds)
         self.train_Y = standardize(train_Y)
 
     def _pre_process(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -77,21 +78,25 @@ class RelativeSampler(Sampler):
         train_Y = self.train_Y.to(device=self.device, dtype=self.dtype)
 
         # Use normalized bounds [0,1] since inputs are normalized
-        norm_bounds = torch.tensor([[0.] * self.bounds.shape[1], 
-                                  [1.] * self.bounds.shape[1]], 
-                                 device=self.device,
-                                 dtype=self.dtype)
+        norm_bounds = torch.tensor(
+            [[0.] * self.bounds.shape[1], 
+            [1.] * self.bounds.shape[1]], 
+            device=self.device,
+            dtype=self.dtype
+        )
         
         return train_X, train_Y, norm_bounds
     
     def _post_process(self, samples: torch.Tensor) -> torch.Tensor:
-        return unnormalize(
-            samples,
-            bounds=self.bounds
-        )
+        return unnormalize(samples, bounds=self.bounds)
 
     @abstractmethod
-    def _sample(self, train_X: torch.Tensor, train_Y: torch.Tensor, bounds: torch.Tensor) -> torch.Tensor:
+    def _sample(
+        self, 
+        train_X: torch.Tensor, 
+        train_Y: torch.Tensor, 
+        bounds: torch.Tensor
+    ) -> torch.Tensor:
         """Core sampling logic to be implemented by subclasses.
         
         Args:
