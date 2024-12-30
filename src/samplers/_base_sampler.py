@@ -49,8 +49,6 @@ class IndependentSampler(Sampler):
 class RelativeSampler(Sampler):
     def __init__(
         self,
-        train_X: torch.Tensor,
-        train_Y: torch.Tensor,
         bounds: torch.Tensor,
         batch_size: int = 1, 
         dtype: torch.dtype = None,
@@ -63,7 +61,8 @@ class RelativeSampler(Sampler):
         self.dtype = dtype or bounds.dtype
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.set_train_data(train_X, train_Y)
+        self.train_X = None
+        self.train_Y = None
 
     def set_train_data(self, train_X: torch.Tensor, train_Y: torch.Tensor):
         # Normalize inputs and standardize outputs

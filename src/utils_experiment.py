@@ -7,7 +7,8 @@ from botorch.acquisition.logei import qLogExpectedImprovement
 from botorch.acquisition.logei import qLogNoisyExpectedImprovement
 from botorch.acquisition.monte_carlo import qUpperConfidenceBound
 
-from .samplers import gp_sampler, llla_l2_sampler, llla_artl_sampler, vbla_sampler
+# from .samplers import gp_sampler, llla_l2_sampler, llla_artl_sampler, vbla_sampler
+from src.samplers import GPSampler
 from .test_functions import SyntheticSine, BraninFoo, Ackley2d, Ackley5d, Hartmann6d
 
 
@@ -67,25 +68,15 @@ def get_objective_function(name):
         raise ValueError(f"Objective function {name} not recognized.")
     
 
-def get_surrogate_model(name):
+def get_sampler(name):
     if name == "gp":
-        return gp_sampler
-    elif name == "vbla":
-        return vbla_sampler
-    elif name == "llla_l2":
-        return llla_l2_sampler
-    elif name == "llla_artl":
-        return llla_artl_sampler
+        return GPSampler
+    # elif name == "vbla":
+    #     return vbla_sampler
+    # elif name == "llla_l2":
+    #     return llla_l2_sampler
+    # elif name == "llla_artl":
+    #     return llla_artl_sampler
     else:
         raise ValueError(f"Surrogate model {name} not recognized.")
     
-
-def get_acquisition_function(name):
-    if name == "log_ei":
-        return qLogExpectedImprovement
-    elif name == "log_nei":
-        return qLogNoisyExpectedImprovement
-    elif name == "ucb":
-        return qUpperConfidenceBound
-    else:
-        raise ValueError(f"Acquisition function {name} not recognized.")

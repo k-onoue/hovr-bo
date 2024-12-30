@@ -55,8 +55,6 @@ class BayesianOptimization:
         )
 
         self.relative_sampler = sampler(
-            train_X=None,
-            train_Y=None,
             bounds=self.bounds,
             batch_size=self.batch_size,
             dtype=self.dtype,

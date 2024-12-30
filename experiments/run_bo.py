@@ -6,7 +6,7 @@ import torch
 
 from _src import BayesianOptimization
 from _src import set_logger
-from _src import get_objective_function, get_surrogate_model, get_acquisition_function
+from _src import get_objective_function, get_sampler
 
 
 class Experiment:
@@ -38,17 +38,16 @@ class Experiment:
     def _unpack_sampler_settings(self):
         sampler_settings = self.settings["sampler"]
         return (
-            get_surrogate_model(sampler_settings["function"]),
-            get_acquisition_function(sampler_settings["acqf"]),
+            get_sampler(sampler_settings["surrogate"]),
+            sampler_settings.get("acqf", "log_ei"),  # Default acquisition function if not specified
             sampler_settings.get("sampler_args", {}),
         )
 
     def run(self, save_dir: str):
-        
         n_initial_eval, initial_sample_method, n_iter, batch_size, is_maximize, device, dtype, seed = self._unpack_basic_settings()
         objective_function, noise_std, outlier_prob, outlier_scale, outlier_std = self._unpack_objective_settings()
 
-        sampler, acqf, sampler_args = self._unpack_sampler_settings()
+        sampler, acqf_name, sampler_args = self._unpack_sampler_settings()
 
         objective_function = objective_function(
             noise_std=noise_std,
@@ -67,7 +66,7 @@ class Experiment:
             is_maximize=is_maximize,
             device=device,
             dtype=dtype,
-            acqf=acqf,
+            acqf_name=acqf_name,  # Updated parameter
             seed=seed,
             sampler_args=sampler_args,
         )
@@ -77,8 +76,8 @@ class Experiment:
 
         _seed = seed
         _obj = self.settings["objective"]["function"]
-        _sampler = self.settings["sampler"]["function"]
-        _acqf = self.settings["sampler"]["acqf"]
+        _sampler = self.settings["sampler"]["surrogate"]
+        _acqf = self.settings["sampler"].get("acqf", "log_ei")
 
         filename = f"{_obj}_{_sampler}_{_acqf}_{_seed}.csv"
         filename = os.path.join(save_dir, filename)
@@ -92,34 +91,11 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=0, help="Seed for the experiment")
     args = parser.parse_args()
 
-    base_script_name = os.path.splitext(__file__.split("/")[-1])[0]
-    results_dir = os.path.join("results", args.timestamp)
-    os.makedirs(results_dir, exist_ok=True)
-
-    set_logger(base_script_name, results_dir)
-
-    with open(args.settings, 'r') as f:
+    with open(args.settings, "r") as f:
         settings = json.load(f)
 
-    settings["seed"] = args.seed
     experiment = Experiment(settings)
-    experiment.run(results_dir)
-
-
-
-        # "sampler": {
-        #     "name": "llla_artl",
-        #     "acqf": "log_ei",
-        #     "sampler_args": {
-        #         "loss_params": {
-        #             "n_epochs": 1000,
-        #             "lr": 1e-2,
-        #             "weight_decay": 0,
-        #             "artl_weight": 1e-3,
-        #             "lambd": 0,
-        #             "k": (1, 2, 3),
-        #             "q": 1,
-        #             "M": 10,
-        #         },
-        #     },
-        # },
+    base_script_name = os.path.splitext(os.path.basename(__file__))[0]
+    results_dir = os.path.join("results", args.timestamp)
+    os.makedirs(results_dir, exist_ok=True)
+    experiment.run(save_dir=results_dir)

@@ -3,7 +3,6 @@ from botorch.models import SingleTaskGP
 from botorch.fit import fit_gpytorch_mll
 from botorch.optim import optimize_acqf
 from botorch.sampling import SobolQMCNormalSampler
-from botorch.utils.transforms import unnormalize
 from gpytorch.mlls import ExactMarginalLogLikelihood
 
 from ._base_sampler import RelativeSampler
@@ -13,8 +12,6 @@ from ._utils import get_acquisition_function
 class GPSampler(RelativeSampler):
     def __init__(
         self,
-        train_X: torch.Tensor,
-        train_Y: torch.Tensor,
         bounds: torch.Tensor,
         batch_size: int = 1,
         dtype: torch.dtype = torch.float64,
@@ -25,8 +22,6 @@ class GPSampler(RelativeSampler):
         """Initialize GP-based sampler.
         
         Args:
-            train_X: Training inputs
-            train_Y: Training outputs
             bounds: Original bounds for the input space
             batch_size: Number of points to sample
             dtype: Torch data type
@@ -34,8 +29,6 @@ class GPSampler(RelativeSampler):
             acqf_name: Name of acquisition function
         """
         super().__init__(
-            train_X=train_X,
-            train_Y=train_Y, 
             bounds=bounds,
             batch_size=batch_size,
             dtype=dtype,

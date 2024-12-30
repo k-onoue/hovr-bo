@@ -11,13 +11,12 @@ sys.path.append(PROJECT_DIR)
 
 from src.bo import BayesianOptimization
 from src.utils_experiment import set_logger
-from src.utils_experiment import get_objective_function, get_surrogate_model, get_acquisition_function
+from src.utils_experiment import get_objective_function, get_sampler
 
 
 __all__ = [
     "BayesianOptimization",
     "get_objective_function",
-    "get_surrogate_model",
-    "get_acquisition_function",
+    "get_sampler",
     "set_logger",
 ]
