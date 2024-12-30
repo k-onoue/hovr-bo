@@ -21,8 +21,8 @@
             "loss_params": {
                 "n_epochs": 10000,
                 "lr": 1e-2,
-                "weight_decay": 0,
-                "artl_weight": 1e-1,
+                "weight_decay": 1e-2,
+                "artl_weight": 0,
                 "lambd": 0,
                 "k": [3],
                 "q": 2,

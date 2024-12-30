@@ -10,7 +10,7 @@ from botorch.sampling import SobolQMCNormalSampler
 
 # -- LLLA -------------------------------------------
 import plotly.graph_objects as go
-from .llla import LaplaceBNN
+from .models.llla import LaplaceBNN
 
 def llla_artl_sampler(
     train_X: torch.Tensor,

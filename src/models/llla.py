@@ -10,8 +10,8 @@ from gpytorch import distributions as gdists
 from laplace import Laplace
 from torch import Tensor
 
-from .nn_utils import RegNet, get_best_hyperparameters
-from .nn_utils import augmented_and_regularized_trimmed_loss
+from ..utils_nn import RegNet, get_best_hyperparameters
+from ..utils_nn import augmented_and_regularized_trimmed_loss
 # from .nn_utils import EarlyStopping
 from early_stopping_pytorch import EarlyStopping
 

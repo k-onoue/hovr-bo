@@ -1,4 +1,5 @@
 import logging
+import random
 from typing import Callable, Literal, Optional
 
 import numpy as np
@@ -8,35 +9,30 @@ from plotly.subplots import make_subplots
 from tabulate import tabulate
 import torch
 
-from .sampler_wrapper import IndependentSampler, RelativeSampler
+from .samplers._base_sampler import IndependentSampler, RelativeSampler
 
 
 class BayesianOptimization:
     def __init__(
         self,
         objective_function: Callable,
-        sampler: Callable,
-        acqf: Callable,
-        n_initial_eval: int = 5,
+        sampler: RelativeSampler,
+        acqf_name: Literal["log_ei", "log_nei", "ucb"] = "log_ei",
         initial_sample_method: Literal["sobol", "random"] = "sobol",
+        n_initial_eval: int = 5,
         n_iter: int = 30,
         batch_size: int = 1,
         is_maximize: bool = False,
         device: torch.device = torch.device("cpu"),
         dtype: torch.dtype = torch.float64,
         seed: int = None,
-        model_param_path_prefix: str = "./params/checkpoint",
         sampler_args: Optional[dict] = None,
     ):
         self.seed = seed
         self._set_seed()
-        self.model_param_path = self._set_model_param_path(
-            prefix=model_param_path_prefix
-        )
 
         self.objective_function = objective_function
         self.sampler = sampler
-        self.acqf = acqf
         self.device = device
         self.dtype = dtype
 
@@ -44,7 +40,11 @@ class BayesianOptimization:
         self.batch_size = batch_size
         self.is_maximize = is_maximize
 
-        self.bounds = torch.tensor(self.objective_function._bounds, device=self.device, dtype=self.dtype).t()
+        self.bounds = torch.tensor(
+            self.objective_function._bounds, 
+            device=self.device, 
+            dtype=self.dtype
+        ).t()
     
         self.indenpendent_sampler = IndependentSampler(
             n_initial_eval=n_initial_eval,
@@ -54,10 +54,16 @@ class BayesianOptimization:
             device=self.device,
         )
 
-        self.relative_sampler = None
-
-        self.sampler = sampler
-        self.sampler_args = sampler_args or {}
+        self.relative_sampler = sampler(
+            train_X=None,
+            train_Y=None,
+            bounds=self.bounds,
+            batch_size=self.batch_size,
+            dtype=self.dtype,
+            device=self.device,
+            acqf_name=acqf_name,
+            **sampler_args
+        )
 
         # Initialize cumulative data storage
         self.X_all = None
@@ -68,14 +74,9 @@ class BayesianOptimization:
 
     def _set_seed(self):
         seed = self.seed if self.seed else 42
-        torch.manual_seed(seed)
+        random.seed(seed)
         np.random.seed(seed)
-
-    def _set_model_param_path(self, prefix: str = None):
-        from datetime import datetime
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
-        prefix = prefix or "checkpoint"
-        return f"{prefix}_{timestamp}.pt"
+        torch.manual_seed(seed)
 
     def _evaluate(self, X_new: torch.Tensor):
         """
@@ -102,24 +103,10 @@ class BayesianOptimization:
         # Main optimization loop
         for iter in range(self.n_iter):
             
-            if self.relative_sampler is None:
-                self.relative_sampler = RelativeSampler(
-                    train_X=self.X_all,
-                    train_Y=self.Y_all if self.is_maximize else -self.Y_all,
-                    sampler=self.sampler,
-                    acqf=self.acqf,
-                    bounds=self.bounds,
-                    batch_size=self.batch_size,
-                    dtype=self.dtype,
-                    device=self.device,
-                    model_param_path=self.model_param_path,
-                    **self.sampler_args,
-                )
-            else:
-                self.relative_sampler.set_train_data(
-                    train_X=self.X_all, 
-                    train_Y=self.Y_all if self.is_maximize else -self.Y_all
-                )
+            self.relative_sampler.set_train_data(
+                train_X=self.X_all, 
+                train_Y=self.Y_all if self.is_maximize else -self.Y_all
+            )
 
             # Sample new candidates
             candidates = self.relative_sampler.sample()

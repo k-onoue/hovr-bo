@@ -1,11 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Literal, Optional, Tuple
+from typing import Literal, Optional, Tuple
 
 import torch
 from botorch.utils.transforms import normalize, unnormalize, standardize
 
 
-# --- Wrapper -----------------------------------------------------------------
 class Sampler(ABC):
     @abstractmethod
     def sample(self, bounds: torch.Tensor) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
@@ -52,27 +51,17 @@ class RelativeSampler(Sampler):
         self,
         train_X: torch.Tensor,
         train_Y: torch.Tensor,
-        sampler: Callable,
-        acqf: Callable,
         bounds: torch.Tensor,
         batch_size: int = 1, 
         dtype: torch.dtype = None,
         device: torch.device = None,
-        model_param_path: Optional[str] = None,
         **kwargs
     ):
-        self.model_param_path = model_param_path
 
         self.bounds = bounds
         self.batch_size = batch_size
         self.dtype = dtype or bounds.dtype
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
-        self.sampler = sampler
-        self.sampler_kwargs = kwargs
-        self.acqf = acqf
-
-        self.saved_model_state = None
 
         self.set_train_data(train_X, train_Y)
 
@@ -84,30 +73,40 @@ class RelativeSampler(Sampler):
         )
         self.train_Y = standardize(train_Y)
 
-    def sample(self) -> torch.Tensor:
-        # Sample in normalized space
-        normalized_bounds = torch.stack([
-            torch.zeros(self.bounds.shape[1], device=self.device, dtype=self.dtype),
-            torch.ones(self.bounds.shape[1], device=self.device, dtype=self.dtype)
-        ])
+    def _pre_process(self) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        train_X = self.train_X.to(device=self.device, dtype=self.dtype)
+        train_Y = self.train_Y.to(device=self.device, dtype=self.dtype)
+
+        # Use normalized bounds [0,1] since inputs are normalized
+        norm_bounds = torch.tensor([[0.] * self.bounds.shape[1], 
+                                  [1.] * self.bounds.shape[1]], 
+                                 device=self.device,
+                                 dtype=self.dtype)
         
-        normalized_candidates = self.sampler(
-            train_X=self.train_X,
-            train_Y=self.train_Y,
-            bounds=normalized_bounds,
-            batch_size=self.batch_size,
-            mc_acqf=self.acqf,
-            dtype=self.dtype,
-            device=self.device,
-            model_param_path=self.model_param_path,
-            **self.sampler_kwargs
-        )
-        
-        # Transform back to original space
-        candidates = unnormalize(
-            normalized_candidates,
+        return train_X, train_Y, norm_bounds
+    
+    def _post_process(self, samples: torch.Tensor) -> torch.Tensor:
+        return unnormalize(
+            samples,
             bounds=self.bounds
         )
-        
-        return candidates
 
+    @abstractmethod
+    def _sample(self, train_X: torch.Tensor, train_Y: torch.Tensor, bounds: torch.Tensor) -> torch.Tensor:
+        """Core sampling logic to be implemented by subclasses.
+        
+        Args:
+            train_X: Normalized training inputs
+            train_Y: Standardized training outputs  
+            bounds: Normalized bounds tensor
+            
+        Returns:
+            Normalized candidate points
+        """
+        pass
+
+    def sample(self) -> torch.Tensor:
+        """Full sampling pipeline with pre/post processing."""
+        train_X, train_Y, norm_bounds = self._pre_process()
+        candidates = self._sample(train_X, train_Y, norm_bounds)
+        return self._post_process(candidates)
