@@ -10,8 +10,8 @@ from gpytorch import distributions as gdists
 from laplace import Laplace
 from torch import Tensor
 
-from ..utils_nn import RegNet, get_best_hyperparameters
-from ..utils_nn import augmented_and_regularized_trimmed_loss
+from ._utils import RegNet, get_best_hyperparameters
+from ._utils import augmented_and_regularized_trimmed_loss
 # from .nn_utils import EarlyStopping
 from early_stopping_pytorch import EarlyStopping
 
@@ -54,7 +54,7 @@ class LaplacePosterior(Posterior):
         return self.post.dtype
     
 
-class LaplaceBNN(Model):
+class LaplaceModel(Model):
     def __init__(
         self, 
         args: dict, 

@@ -40,7 +40,12 @@ class GPSampler(RelativeSampler):
         self.surrogate = SingleTaskGP
         self.acquisition = get_acquisition_function(acqf_name)
 
-    def _sample(self, train_X: torch.Tensor, train_Y: torch.Tensor, bounds: torch.Tensor) -> torch.Tensor:
+    def _sample(
+        self, 
+        train_X: torch.Tensor, 
+        train_Y: torch.Tensor, 
+        bounds: torch.Tensor
+    ) -> torch.Tensor:
         model = self.surrogate(train_X, train_Y)
         mll = ExactMarginalLogLikelihood(model.likelihood, model)
         fit_gpytorch_mll(mll)
@@ -48,7 +53,7 @@ class GPSampler(RelativeSampler):
         acquisition_function = self.acquisition(
             model=model,
             best_f=train_Y.max(),
-            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([500])),
+            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([1024])),
         )
 
         candidates, _ = optimize_acqf(

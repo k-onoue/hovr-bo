@@ -100,6 +100,8 @@ class BayesianOptimization:
 
         # Main optimization loop
         for iter in range(self.n_iter):
+
+            print(f"Iteration {iter+1}/{self.n_iter} started.")
             
             self.relative_sampler.set_train_data(
                 train_X=self.X_all, 

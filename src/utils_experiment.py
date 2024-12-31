@@ -8,7 +8,7 @@ from botorch.acquisition.logei import qLogNoisyExpectedImprovement
 from botorch.acquisition.monte_carlo import qUpperConfidenceBound
 
 # from .samplers import gp_sampler, llla_l2_sampler, llla_artl_sampler, vbla_sampler
-from src.samplers import GPSampler
+from src.samplers import GPSampler, LastVBSampler
 from .test_functions import SyntheticSine, BraninFoo, Ackley2d, Ackley5d, Hartmann6d
 
 
@@ -71,8 +71,8 @@ def get_objective_function(name):
 def get_sampler(name):
     if name == "gp":
         return GPSampler
-    # elif name == "vbla":
-    #     return vbla_sampler
+    elif name == "vbll":
+        return LastVBSampler
     # elif name == "llla_l2":
     #     return llla_l2_sampler
     # elif name == "llla_artl":

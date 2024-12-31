@@ -6,9 +6,9 @@ from ._base_sampler import RelativeSampler
 from ._utils import get_acquisition_function
 
 
-class LastLaplaceL2Sampler(RelativeSampler):
+class DAPL2Sampler(RelativeSampler):
     pass
 
 
-class LastLaplaceARTLSampler(RelativeSampler):
+class DAPARTLSampler(RelativeSampler):
     pass
