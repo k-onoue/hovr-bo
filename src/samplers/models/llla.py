@@ -9,9 +9,9 @@ from laplace import Laplace
 from torch import Tensor
 from torch.utils.data import DataLoader
 
-# from ._utils import EarlyStopping
-# from ._utils import MLP
-# from ._utils import hovr_loss_fn, trimmed_loss_fn
+from ._utils import EarlyStopping
+from ._utils import MLP
+from ._utils import hovr_loss_fn, trimmed_loss_fn
 
 
 class LaplaceModel(Model):
@@ -292,79 +292,79 @@ class LaplaceModel(Model):
     
 
 
-# Example testing the LaplaceModel with 1D regression
-if __name__ == "__main__":
-    import numpy as np
-    import plotly.graph_objects as go
+# # Example testing the LaplaceModel with 1D regression
+# if __name__ == "__main__":
+#     import numpy as np
+#     import plotly.graph_objects as go
 
-    from _utils import EarlyStopping
-    from _utils import MLP
-    from _utils import hovr_loss_fn, trimmed_loss_fn
+#     from _utils import EarlyStopping
+#     from _utils import MLP
+#     from _utils import hovr_loss_fn, trimmed_loss_fn
 
 
-    # Generate synthetic data
-    np.random.seed(0)
-    torch.manual_seed(0)
+#     # Generate synthetic data
+#     np.random.seed(0)
+#     torch.manual_seed(0)
 
-    X = np.linspace(-5, 5, 5).reshape(-1, 1)
-    y = np.sin(X) + 0.2 * np.random.normal(size=X.shape)
+#     X = np.linspace(-5, 5, 30).reshape(-1, 1)
+#     y = np.sin(X) + 0.2 * np.random.normal(size=X.shape)
 
-    X_train = torch.tensor(X, dtype=torch.float64)
-    y_train = torch.tensor(y, dtype=torch.float64)
+#     X_train = torch.tensor(X, dtype=torch.float64)
+#     y_train = torch.tensor(y, dtype=torch.float64)
 
-    # Define model configuration
-    model = LaplaceModel(
-        dimensions=[128, 128, 128],
-        activation="tanh",
-        input_dim=1,
-        output_dim=1,
-    )
+#     # Define model configuration
+#     model = LaplaceModel(
+#         dimensions=[128, 128, 128],
+#         activation="tanh",
+#         input_dim=1,
+#         output_dim=1,
+#     )
 
-    config = {
-        "batch_size": 16,
-        "epochs": 5000,
-        "prior_precision": 1e-2, # too small prior precision can lead to numerical instability
-        "sigma_noise": 1e-1,
-        "loss_coeffs": {"mse": 1, "trim": 1e-1, "hovr": 1e-3},
-    }
+#     config = {
+#         "batch_size": 16,
+#         "epochs": 5000,
+#         "prior_precision": 1e-2, # too small prior precision can lead to numerical instability
+#         "sigma_noise": 1e-1,
+#         "loss_coeffs": {"mse": 1, "trim": 1e-1, "hovr": 1e-3},
+#     }
 
-    # Train model
-    model.fit(X_train, y_train, config)
+#     # Train model
+#     model.fit(X_train, y_train, config)
 
-    # Predict
-    X_test = torch.linspace(-6, 6, 200).reshape(-1, 1).to(torch.float64)
-    with torch.no_grad():
-        y_pred, covariance = model.forward(X_test)
+#     # Predict
+#     X_test = torch.linspace(-6, 6, 200).reshape(-1, 1).to(torch.float64)
+#     with torch.no_grad():
+#         y_pred, covariance = model.forward(X_test)
 
-    # Convert to numpy for plotting
-    X_test_np = X_test.numpy()
-    y_pred_np = y_pred.numpy().squeeze()
-    std_dev = torch.sqrt(torch.diagonal(covariance, dim1=-2, dim2=-1)).numpy().squeeze()
+#     # Convert to numpy for plotting
+#     X_test_np = X_test.numpy()
+#     y_pred_np = y_pred.numpy().squeeze()
+#     std_dev = torch.sqrt(torch.diagonal(covariance, dim1=-2, dim2=-1)).numpy().squeeze()
 
-    # Plot results
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=X.squeeze(), y=y.squeeze(), mode="markers", name="Training Data"))
-    fig.add_trace(go.Scatter(x=X_test_np.squeeze(), y=y_pred_np, mode="lines", name="Prediction"))
+#     # Plot results
+#     fig = go.Figure()
+#     fig.add_trace(go.Scatter(x=X.squeeze(), y=y.squeeze(), mode="markers", name="Training Data"))
+#     fig.add_trace(go.Scatter(x=X_test_np.squeeze(), y=y_pred_np, mode="lines", name="Prediction"))
 
-    # Add 2-sigma confidence intervals
-    fig.add_trace(go.Scatter(
-        x=X_test_np.squeeze(),
-        y=(y_pred_np + 2 * std_dev),
-        mode="lines",
-        name="Upper 2-sigma",
-        line=dict(dash="dash")
-    ))
-    fig.add_trace(go.Scatter(
-        x=X_test_np.squeeze(),
-        y=(y_pred_np - 2 * std_dev),
-        mode="lines",
-        name="Lower 2-sigma",
-        line=dict(dash="dash")
-    ))
+#     # Add 2-sigma confidence intervals
+#     fig.add_trace(go.Scatter(
+#         x=X_test_np.squeeze(),
+#         y=(y_pred_np + 2 * std_dev),
+#         mode="lines",
+#         name="Upper 2-sigma",
+#         line=dict(dash="dash")
+#     ))
+#     fig.add_trace(go.Scatter(
+#         x=X_test_np.squeeze(),
+#         y=(y_pred_np - 2 * std_dev),
+#         mode="lines",
+#         name="Lower 2-sigma",
+#         line=dict(dash="dash")
+#     ))
 
-    fig.update_layout(
-        title="1D Function Regression with Laplace Model",
-        xaxis_title="Input",
-        yaxis_title="Output",
-    )
-    fig.show()
+#     fig.update_layout(
+#         title="1D Function Regression with Laplace Model",
+#         xaxis_title="Input",
+#         yaxis_title="Output",
+#     )
+#     fig.show()

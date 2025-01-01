@@ -85,56 +85,47 @@ def trimmed_loss_fn(model, X_tensor, y_tensor, h=None):
 
 
 def hovr_loss_fn(model, X_tensor, _, k=(1, 2), q=2, M=10):
-    """
-    Compute the HOVR Loss.
+    """Compute the HOVR Loss."""
+    # Skip HOVR computation during validation
+    if not model.training:
+        return torch.tensor(0.0, device=X_tensor.device)
     
-    Parameters:
-    - model: Neural network model
-    - X_tensor: Input data (torch.Tensor)
-    - k: Tuple of derivative orders (default: (1, 2))
-    - q: Exponent in HOVR (default: 2)
-    - M: Number of random points (default: 10)
-    
-    Returns:
-    - hovr_loss: Computed HOVR loss
-    """
     x_min, x_max = X_tensor.min(0)[0], X_tensor.max(0)[0]
-
-    # Generate random points in PyTorch with proper gradient tracking
-    random_points = torch.rand((M, X_tensor.shape[1]), dtype=torch.double, device=X_tensor.device, requires_grad=True)
+    
+    # Generate random points
+    random_points = torch.rand(
+        (M, X_tensor.shape[1]), 
+        dtype=torch.double, 
+        device=X_tensor.device, 
+        requires_grad=True
+    )
     random_points = random_points * (x_max - x_min) + x_min
 
-    preds_random = model(random_points)
+    with torch.set_grad_enabled(True):  # Ensure gradients are enabled
+        preds_random = model(random_points)
+        
+        # First-order gradients
+        grads = torch.autograd.grad(
+            preds_random, 
+            random_points,
+            torch.ones_like(preds_random), 
+            create_graph=True
+        )[0]
 
+        hovr_term = 0.0
+        n_dims = X_tensor.shape[1]
 
-    print()
-    print()
-    print()
-    print(f"random_points.requires_grad: {random_points.requires_grad}")
-    print(f"preds_random.requires_grad: {preds_random.requires_grad}")
-    print(f"preds_random.grad_fn: {preds_random.grad_fn}")
-    print()
-    print()
-    print()
-
-
-
-    # First-order gradients
-    grads = torch.autograd.grad(
-        preds_random, random_points, torch.ones_like(preds_random), create_graph=True
-    )[0]
-
-    hovr_term = 0.0
-    n_dims = X_tensor.shape[1]
-
-    # Compute higher-order gradients for each order in k
-    for order in k:
-        temp_grads = grads
-        for _ in range(order - 1):
-            temp_grads = torch.autograd.grad(
-                temp_grads, random_points, torch.ones_like(temp_grads), create_graph=True
-            )[0]
-        hovr_term += (1 / n_dims) * torch.sum(torch.abs(temp_grads) ** q)
+        # Higher-order gradients
+        for order in k:
+            temp_grads = grads
+            for _ in range(order - 1):
+                temp_grads = torch.autograd.grad(
+                    temp_grads,
+                    random_points, 
+                    torch.ones_like(temp_grads),
+                    create_graph=True
+                )[0]
+            hovr_term += (1 / n_dims) * torch.sum(torch.abs(temp_grads) ** q)
 
     return hovr_term
 
