@@ -45,7 +45,7 @@ class LastVBSampler(RelativeSampler):
 
     def _initialize_vbll(self, model_args: dict) -> VBLLModel:
 
-        model = VBLLModel(
+        return VBLLModel(
             dimensions=model_args.get("dimensions", [128, 128, 128]),
             activation=model_args.get("activation", "tanh"),
             input_dim=self.bounds.shape[1],
@@ -58,9 +58,12 @@ class LastVBSampler(RelativeSampler):
             wishart_scale=model_args.get("wishart_scale", 0.1),
         )
 
-        return model
-
-    def _sample(self, train_X: torch.Tensor, train_Y: torch.Tensor, bounds: torch.Tensor) -> torch.Tensor:
+    def _sample(
+        self, 
+        train_X: torch.Tensor, 
+        train_Y: torch.Tensor, 
+        bounds: torch.Tensor
+    ) -> torch.Tensor:
 
         self.surrogate.fit(train_X, train_Y, config=self.optim_config)
 

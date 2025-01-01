@@ -3,12 +3,7 @@ import os
 import sys
 from logging.handlers import RotatingFileHandler
 
-from botorch.acquisition.logei import qLogExpectedImprovement
-from botorch.acquisition.logei import qLogNoisyExpectedImprovement
-from botorch.acquisition.monte_carlo import qUpperConfidenceBound
-
-# from .samplers import gp_sampler, llla_l2_sampler, llla_artl_sampler, vbla_sampler
-from src.samplers import GPSampler, LastVBSampler
+from .samplers import GPSampler, LastVBSampler, LastLaplaceL2Sampler, LastLaplaceARTLSampler
 from .test_functions import SyntheticSine, BraninFoo, Ackley2d, Ackley5d, Hartmann6d
 
 
@@ -73,10 +68,10 @@ def get_sampler(name):
         return GPSampler
     elif name == "vbll":
         return LastVBSampler
-    # elif name == "llla_l2":
-    #     return llla_l2_sampler
-    # elif name == "llla_artl":
-    #     return llla_artl_sampler
+    elif name == "llla_l2":
+        return LastLaplaceL2Sampler
+    elif name == "llla_artl":
+        return LastLaplaceARTLSampler
     else:
         raise ValueError(f"Surrogate model {name} not recognized.")
     
