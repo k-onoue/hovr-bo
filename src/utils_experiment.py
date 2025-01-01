@@ -3,8 +3,11 @@ import os
 import sys
 from logging.handlers import RotatingFileHandler
 
-from .samplers import GPSampler, LastVBSampler, LastLaplaceL2Sampler, LastLaplaceARTLSampler
-from .test_functions import SyntheticSine, BraninFoo, Ackley2d, Ackley5d, Hartmann6d
+from .samplers import (DAPARTLSampler, DAPL2Sampler, GPSampler,
+                       LastLaplaceARTLSampler, LastLaplaceL2Sampler,
+                       LastVBSampler)
+from .test_functions import (Ackley2d, Ackley5d, BraninFoo, Hartmann6d,
+                             SyntheticSine)
 
 
 def set_logger(log_filename_base, save_dir):
@@ -72,6 +75,10 @@ def get_sampler(name):
         return LastLaplaceL2Sampler
     elif name == "llla_artl":
         return LastLaplaceARTLSampler
+    elif name == "dap_l2":
+        return DAPL2Sampler
+    elif name == "dap_artl":
+        return DAPARTLSampler
     else:
         raise ValueError(f"Surrogate model {name} not recognized.")
     
