@@ -1,7 +1,5 @@
-import os
-from typing import Any, Callable, List, Optional
+from typing import Union, Optional, Callable, Any
 
-import numpy as np
 import torch
 from botorch.models.model import Model
 from botorch.posteriors import Posterior
@@ -9,276 +7,364 @@ from botorch.posteriors.gpytorch import GPyTorchPosterior
 from gpytorch import distributions as gdists
 from laplace import Laplace
 from torch import Tensor
+from torch.utils.data import DataLoader
 
-from ._utils import RegNet, get_best_hyperparameters
-from ._utils import augmented_and_regularized_trimmed_loss
-# from .nn_utils import EarlyStopping
-from early_stopping_pytorch import EarlyStopping
+# from ._utils import EarlyStopping
+# from ._utils import MLP
+# from ._utils import hovr_loss_fn, trimmed_loss_fn
 
-
-class LaplacePosterior(Posterior):
-    def __init__(self, posterior, output_dim):
-        super().__init__()
-        self.post = posterior
-        self.output_dim = output_dim
-
-    def rsample(
-        self,
-        sample_shape: Optional[torch.Size] = None,
-    ) -> Tensor:
-        samples = self.post.rsample(sample_shape).squeeze(-1)
-        new_shape = samples.shape[:-1]
-        return samples.reshape(*new_shape, -1, self.output_dim)
-
-    @property
-    def mean(self) -> Tensor:
-        r"""The posterior mean."""
-        post_mean = self.post.mean.squeeze(-1)
-        shape = post_mean.shape
-        return post_mean.reshape(*shape[:-1], -1, self.output_dim)
-
-    @property
-    def variance(self) -> Tensor:
-        r"""The posterior variance."""
-        post_var = self.post.variance.squeeze(-1)
-        shape = post_var.shape
-        return post_var.reshape(*shape[:-1], -1, self.output_dim)
-
-    @property
-    def device(self) -> torch.device:
-        return self.post.device
-
-    @property
-    def dtype(self) -> torch.dtype:
-        r"""The torch dtype of the distribution."""
-        return self.post.dtype
-    
 
 class LaplaceModel(Model):
     def __init__(
-        self, 
-        args: dict, 
-        input_dim, 
-        output_dim, 
-        device: torch.device = torch.device("cpu"),
-        dtype: torch.dtype = torch.float64
-    ):
+        self,
+        dimensions: list[int],
+        activation: str,
+        input_dim: int,
+        output_dim: int,
+        dtype: torch.dtype = torch.float64,
+        device: Union[str, torch.device] = "cpu",
+    ) -> None:
         super().__init__()
-        self.likelihood = "regression"
-        self.regnet_dims = args.get("regnet_dims", [128, 128, 128])
-        self.regnet_activation = args.get("regnet_activation", "tanh")
-        self.prior_var = args.get("prior_var", 10.0)
-        self.noise_var = args.get("noise_var", 1.0)
-        self.iterative = args.get("iterative", True)
-        self.loss_params = args.get("loss_params", {})
-        self.nn = RegNet(
-            dimensions=self.regnet_dims,
-            activation=self.regnet_activation,
+
+        self.output_dim = output_dim
+
+        self.nn = MLP(
+            dimensions=dimensions,
+            activation=activation,
             input_dim=input_dim,
             output_dim=output_dim,
             dtype=dtype,
-            device=device
+            device=device,
         )
+
         self.bnn = None
-        self.output_dim = output_dim
-
-    def posterior_predictive(self, X, bnn):
-        if len(X.shape) < 3:
-            B, D = X.shape
-            Q = 1
-        else:
-            # Transform to `(batch_shape*q, d)`
-            B, Q, D = X.shape
-            X = X.reshape(B * Q, D)
-
-        K = self.num_outputs
-        # Posterior predictive distribution
-        mean_y, cov_y = self._get_prediction(X, bnn)
-
-        # Reshape mean
-        mean_y = mean_y.reshape(B, Q * K)
-
-        # Reshape covariance
-        cov_y += 1e-4 * torch.eye(B * Q * K).to(X)
-        cov_y = cov_y.reshape(B, Q, K, B, Q, K)
-        cov_y = torch.einsum('bqkbrl->bqkrl', cov_y)  # (B, Q, K, Q, K)
-        cov_y = cov_y.reshape(B, Q * K, Q * K)
-
-        dist = gdists.MultivariateNormal(mean_y, covariance_matrix=cov_y)
-        post_pred = GPyTorchPosterior(dist)
-
-        # Return a custom LaplacePosterior if multiple outputs in a batched scenario
-        if K > 1 and Q > 1:
-            return LaplacePosterior(post_pred, self.output_dim)
-        else:
-            return post_pred
-
-    def posterior(
-        self,
-        X: Tensor,
-        output_indices: Optional[List[int]] = None,
-        observation_noise: bool = False,
-        posterior_transform: Optional[Callable[[Posterior], Posterior]] = None,
-        **kwargs: Any,
-    ) -> Posterior:
-        return self.posterior_predictive(X, self.bnn)
 
     @property
     def num_outputs(self) -> int:
         return self.output_dim
 
-    def _get_prediction(self, test_x: torch.Tensor, bnn):
+    def forward(self, X: Tensor) -> Tensor:
+        mean, covariance = self.bnn(X, joint=True)
+        mean = mean.reshape(*mean.shape[:-1], -1, self.output_dim)
+        return mean, covariance
+    
+    def posterior(
+        self, 
+        X: Tensor,
+        output_indices: Optional[list[int]] = None,
+        observation_noise: bool = False,
+        posterior_transform: Optional[Callable[[Posterior], Posterior]] = None,
+        **kwargs: Any,
+    ) -> Posterior:
+        mean, covariance = self.forward(X)
+        dist = gdists.MultivariateNormal(mean, covariance)
+        posterior = GPyTorchPosterior(dist)
+        return posterior
+    
+    def loss_fn(
+        self,
+        x: Tensor,
+        y: Tensor,
+        mse_coeff: float,
+        trim_coeff: float,
+        hovr_coeff: float,
+        h: int = None,
+        k: tuple[int, ...] = (1, 2),
+        q: int = 2,
+        M: int = 10,
+    ) -> Tensor:
         """
-        Batched Laplace prediction.
+        Computes the combined loss based on MSE, trimmed loss, and HOVR loss.
 
         Args:
-            test_x: Tensor of size `(batch_shape, d)`.
+            x (Tensor): Input features.
+            y (Tensor): Target labels.
+            mse_coeff (float): Coefficient for the MSE loss.
+            trim_coeff (float): Coefficient for the trimmed loss.
+            hovr_coeff (float): Coefficient for the HOVR loss.
+            h (int, optional): Parameter for trimmed loss.
+            k (tuple[int, ...], optional): Parameter for HOVR loss.
+            q (int, optional): Parameter for HOVR loss.
+            M (int, optional): Parameter for HOVR loss.
 
         Returns:
-            Tuple of (mean, cov) with shapes:
-            - mean: `(batch_shape, k)`
-            - cov: `(batch_shape*k, batch_shape*k)`
+            Tensor: Combined loss value.
         """
-        mean_y, cov_y = bnn(test_x, joint=True)
-        return mean_y, cov_y
-    
-    def get_likelihood(self, train_x, train_y, prior_var, noise_var):
-        # fit to 80% of the data, and evaluate on the rest
-        n = len(train_x)
-        n_train = int(0.8 * n)
-        train_x, val_x = train_x[:n_train], train_x[n_train:]
-        train_y, val_y = train_y[:n_train], train_y[n_train:]
-        train_loader = torch.utils.data.DataLoader(
-            torch.utils.data.TensorDataset(train_x, train_y),
-            batch_size=min(32, len(train_x)),  # smaller batch size
-            shuffle=True
-        )
+        y_pred = self.nn(x)
 
-        model = self.fit_laplace(train_loader, prior_var, noise_var)
-        posterior = self.posterior_predictive(val_x, model)
-    
-        predictions_mean = posterior.mean
-        predictions_std = torch.sqrt(posterior.variance + self.noise_var)
-        # get log likelihood
-        likelihood = torch.distributions.Normal(predictions_mean, predictions_std).log_prob(val_y).sum()
-        return likelihood
+        # Define individual loss components
+        def calculate_loss(coeff: float, loss_fn: callable, *args, **kwargs) -> float:
+            return coeff * loss_fn(*args, **kwargs) if coeff > 0 else 0
 
-    def fit_laplace(self, train_loader, prior_var, noise_var):
+        # Loss calculations
+        mse_loss = calculate_loss(mse_coeff, torch.nn.MSELoss(), y_pred, y)
+        trim_loss = calculate_loss(trim_coeff, trimmed_loss_fn, self.nn, x, y, h=h)
+        hovr_loss = calculate_loss(hovr_coeff, hovr_loss_fn, self.nn, x, y, k=k, q=q, M=M)
+
+        # Combine losses
+        total_loss = mse_loss + trim_loss + hovr_loss
+        
+        return total_loss
+
+    def fit(
+        self,
+        x: Tensor,
+        y: Tensor,
+        config: dict = {}
+    ) -> None:
         """
-        Fit a Laplace approximation on the last layer of the neural network.
+        MAP Estimation (deterministic training) followed by Uncertainty Estimation via Laplace approximation.
+
+        config = {
+            # Data loading
+            "batch_size": 32,          # Batch size for training
+            "val_split": 0.2,          # Validation split ratio
+            "min_train_size": 5,       # Minimum dataset size for validation split
+
+            # Optimization
+            "optimizer": torch.optim.Adam,  # Optimizer class
+            "lr": 1e-3,                    # Learning rate
+            "weight_decay": 0,             # Weight decay for non-VBLL layers
+            "epochs": 1000,                 # Number of training epochs
+
+            # Loss coefficients
+            "loss_coeffs": {
+                "mse": 1,                 # MSE loss coefficient
+                "trim": 0,                # Trimmed loss coefficient
+                "hovr": 0,                # HOVR loss coefficient
+            }
+
+            # Loss parameters
+            loss_params = {
+                "h": None,                # Number of points to keep after trimming
+                "k": (1, 2),              # Tuple of derivative orders
+                "q": 2,                   # Exponent in HOVR
+                "M": 10,                  # Number of random points
+            }
+
+            # Early Stopping
+            "patience": 20,           # Number of epochs to wait for improvement
+            "verbose": True,         # Print early stopping messages
+            "delta": 0,              # Minimum change to qualify as improvement
+
+            # Laplace approximation
+            "hessian_structure": "full",
+            "prior_precision": 1e-2,  # Too small prior precision can lead to numerical instability
+            "sigma_noise": 1e-1,
+            "temperature": 1,
+        }
         """
-        bnn = Laplace(
-            self.nn, 
-            self.likelihood,
-            sigma_noise=np.sqrt(noise_var),
-            prior_precision=(1 / prior_var),
+        train_loader = self.fit_map(x, y, config) # Share train loader with Laplace
+        
+        self.bnn = Laplace(
+            model=self.nn,
+            likelihood="regression",
             subset_of_weights='last_layer',
-            hessian_structure='full',
+            hessian_structure=config.get("hessian_structure", "full"),
+            prior_precision=config.get("prior_precision", 1e-2),
+            sigma_noise=config.get("sigma_noise", 1e-1),
+            temperature=config.get("temperature", 1),
             enable_backprop=True
         )
-        bnn.fit(train_loader)
-        bnn.optimize_prior_precision(n_steps=50)
 
-        return bnn
+        self.bnn.fit(train_loader)
 
-    def fit(self, train_x, original_train_y, model_param_path=None):
+    def fit_map(
+        self,
+        x: Tensor,
+        y: Tensor,
+        config: dict
+    ) -> None:
         """
-        Train the neural network (MSE + optional ARTL) and optionally fit Laplace approximation.
+        Reference fit method.
         """
-        # Use a smaller batch_size to avoid training with the entire dataset at once
-        batch_size = min(32, len(train_x))
-        train_loader = torch.utils.data.DataLoader(
-            torch.utils.data.TensorDataset(train_x, original_train_y),
-            batch_size=batch_size,
-            shuffle=True
-        )
 
-        n_epochs = self.loss_params.get("n_epochs", 10000)
-        lr = self.loss_params.get("lr", 1e-2)
-        weight_decay = self.loss_params.get("weight_decay", 0)
-        momentum = self.loss_params.get("momentum", 0)
-        artl_weight = self.loss_params.get("artl_weight", 0)  # Weight for ARTL loss
-        h = self.loss_params.get("h", int(0.9 * len(train_x)))
-        lambd = self.loss_params.get("lambd", 1e-3)
-        k = self.loss_params.get("k", (1, 2, 3))
-        q = self.loss_params.get("q", 2)
-        M = self.loss_params.get("M", 10)
+        # Retrieve minimum training size for Early Stopping
+        min_train_size = config.get("min_train_size", 5)
+        
+        dataset_size = x.size(0)
+        
+        if dataset_size >= min_train_size:
+            # Split data into training and validation sets
+            val_split = config.get("val_split", 0.2)
+            indices = torch.randperm(dataset_size)
+            split = int(val_split * dataset_size)
+            train_indices, val_indices = indices[split:], indices[:split]
+            train_dataset = torch.utils.data.TensorDataset(x[train_indices], y[train_indices])
+            val_dataset = torch.utils.data.TensorDataset(x[val_indices], y[val_indices])
+            train_loader = DataLoader(train_dataset, batch_size=config.get("batch_size", 32), shuffle=True)
+            val_loader = DataLoader(val_dataset, batch_size=config.get("batch_size", 32), shuffle=False)
 
-        # Load model state if provided and the file exists
-        if model_param_path and os.path.isfile(model_param_path):
-            try:
-                model_state = torch.load(model_param_path, weights_only=True)
-                self.nn.load_state_dict(model_state)
-            except EOFError:
-                # File is empty or corrupted
-                model_state = None
+            # Initialize EarlyStopping
+            early_stopping = EarlyStopping(
+                patience=config.get("patience", 20),
+                verbose=config.get("verbose", True),
+                delta=config.get("delta", 0)
+            )
 
-        # Use a simple SGD without scheduling
-        optimizer = torch.optim.SGD(
-            self.nn.parameters(), 
-            lr=lr, 
-            weight_decay=weight_decay, 
-            momentum=momentum
-        )
-        mse_loss_func = torch.nn.MSELoss()
+        else:
+            # Use the entire dataset for training without validation
+            train_dataset = torch.utils.data.TensorDataset(x, y)
+            train_loader = DataLoader(train_dataset, batch_size=config.get("batch_size", 32), shuffle=True)
+            val_loader = None  # No validation
+            early_stopping = None  # EarlyStopping not applied
 
-        early_stopping = EarlyStopping(patience=1000, verbose=True, path=model_param_path)
+        weight_decay = config.get("weight_decay", 0)
 
-        for epoch in range(n_epochs):
-            for x, y in train_loader:
+        loss_coeffs = config.get("loss_coeffs", {})
+        mse_coeff = loss_coeffs.get("mse", 1)
+        trim_coeff = loss_coeffs.get("trim", 0)
+        hovr_coeff = loss_coeffs.get("hovr", 0)
+        total_coeff = mse_coeff + trim_coeff + hovr_coeff + weight_decay
+        mse_coeff /= total_coeff
+        trim_coeff /= total_coeff
+        hovr_coeff /= total_coeff
+        weight_decay /= total_coeff
+
+        loss_params = config.get("loss_params", {})
+        h = loss_params.get("h", None)
+        k = loss_params.get("k", (1, 2))
+        q = loss_params.get("q", 2)
+        M = loss_params.get("M", 10)
+
+        non_out_layer_params = []
+        out_layer_params = []
+        for name, param in self.named_parameters():
+            if name.startswith("nn.out_layer"):
+                out_layer_params.append(param)
+            else:
+                non_out_layer_params.append(param)
+
+        param_list = [
+            {"params": non_out_layer_params, "weight_decay": weight_decay},
+            {"params": out_layer_params, "weight_decay": 0},
+        ]
+
+        optimizer_class = config.get("optimizer", torch.optim.Adam)
+        optimizer = optimizer_class(param_list, lr=config.get("lr", 1e-3))
+
+        epochs = config.get("epochs", 1000)
+        for _ in range(epochs):
+            self.train()
+            for x_batch, y_batch in train_loader:
+
                 optimizer.zero_grad()
-
-                # Compute MSE loss
-                mse_loss = mse_loss_func(self.nn(x), y)
-
-                # Compute ARTL loss if needed
-                if artl_weight != 0:
-                    artl_loss_val = augmented_and_regularized_trimmed_loss(
-                        model=self.nn,
-                        X_tensor=x,
-                        y_tensor=y,
-                        h=h,
-                        lambd=lambd,
-                        k=k,
-                        q=q,
-                        M=M
-                    )
-                else:
-                    artl_loss_val = 0
-
-                # Combine both losses
-                total_loss = mse_loss + artl_weight * artl_loss_val
-
-                # Backpropagation
-                total_loss.backward()
+                batch_loss = self.loss_fn(
+                    x_batch, 
+                    y_batch, 
+                    mse_coeff, 
+                    trim_coeff, 
+                    hovr_coeff,
+                    h=h,
+                    k=k,
+                    q=q,
+                    M=M
+                )
+                batch_loss.backward()
                 optimizer.step()
 
-            # Logging
-            mse_loss_value = mse_loss.item()
-            artl_loss_value = (
-                artl_loss_val.item() if isinstance(artl_loss_val, torch.Tensor) else artl_loss_val
-            )
+            if early_stopping and val_loader is not None:
+                # Validation
+                self.eval()
+                val_loss = 0
+                with torch.no_grad():
+                    for x_val, y_val in val_loader:
+                        loss = self.loss_fn(
+                            x_val, 
+                            y_val,
+                            mse_coeff,
+                            trim_coeff,
+                            hovr_coeff,
+                            h=h,
+                            k=k,
+                            q=q,
+                            M=M
+                        )
+                        val_loss += loss.item()
+                val_loss /= len(val_loader)
 
-            print(f"Epoch {epoch+1}/{n_epochs}: MSE Loss: {mse_loss_value}, ARTL Loss: {artl_loss_value}")
+                # Check early stopping
+                early_stopping(val_loss, self)
+                if early_stopping.early_stop:
+                    break
+        
+        return train_loader
+    
 
-            # Use training loss as "validation" loss for early stopping
-            # val_loss = total_loss.item()
-            val_loss = mse_loss_value
-            early_stopping(val_loss, self.nn)
 
-            if early_stopping.early_stop:
-                print("Early stopping triggered")
-                break
+# Example testing the LaplaceModel with 1D regression
+if __name__ == "__main__":
+    import numpy as np
+    import plotly.graph_objects as go
 
-        # Reload the best model weights
-        self.nn.load_state_dict(torch.load(model_param_path, weights_only=True))
-        self.nn.eval()
+    from _utils import EarlyStopping
+    from _utils import MLP
+    from _utils import hovr_loss_fn, trimmed_loss_fn
 
-        # Fit Laplace approximation if iterative
-        if self.iterative:
-            llh_fn = self.get_likelihood
-            self.prior_var, self.noise_var = get_best_hyperparameters(
-                train_x, original_train_y, llh_fn
-            )
 
-        self.bnn = self.fit_laplace(train_loader, self.prior_var, self.noise_var)
+    # Generate synthetic data
+    np.random.seed(0)
+    torch.manual_seed(0)
+
+    X = np.linspace(-5, 5, 5).reshape(-1, 1)
+    y = np.sin(X) + 0.2 * np.random.normal(size=X.shape)
+
+    X_train = torch.tensor(X, dtype=torch.float64)
+    y_train = torch.tensor(y, dtype=torch.float64)
+
+    # Define model configuration
+    model = LaplaceModel(
+        dimensions=[128, 128, 128],
+        activation="tanh",
+        input_dim=1,
+        output_dim=1,
+    )
+
+    config = {
+        "batch_size": 16,
+        "epochs": 5000,
+        "prior_precision": 1e-2, # too small prior precision can lead to numerical instability
+        "sigma_noise": 1e-1,
+        "loss_coeffs": {"mse": 1, "trim": 1e-1, "hovr": 1e-3},
+    }
+
+    # Train model
+    model.fit(X_train, y_train, config)
+
+    # Predict
+    X_test = torch.linspace(-6, 6, 200).reshape(-1, 1).to(torch.float64)
+    with torch.no_grad():
+        y_pred, covariance = model.forward(X_test)
+
+    # Convert to numpy for plotting
+    X_test_np = X_test.numpy()
+    y_pred_np = y_pred.numpy().squeeze()
+    std_dev = torch.sqrt(torch.diagonal(covariance, dim1=-2, dim2=-1)).numpy().squeeze()
+
+    # Plot results
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=X.squeeze(), y=y.squeeze(), mode="markers", name="Training Data"))
+    fig.add_trace(go.Scatter(x=X_test_np.squeeze(), y=y_pred_np, mode="lines", name="Prediction"))
+
+    # Add 2-sigma confidence intervals
+    fig.add_trace(go.Scatter(
+        x=X_test_np.squeeze(),
+        y=(y_pred_np + 2 * std_dev),
+        mode="lines",
+        name="Upper 2-sigma",
+        line=dict(dash="dash")
+    ))
+    fig.add_trace(go.Scatter(
+        x=X_test_np.squeeze(),
+        y=(y_pred_np - 2 * std_dev),
+        mode="lines",
+        name="Lower 2-sigma",
+        line=dict(dash="dash")
+    ))
+
+    fig.update_layout(
+        title="1D Function Regression with Laplace Model",
+        xaxis_title="Input",
+        yaxis_title="Output",
+    )
+    fig.show()

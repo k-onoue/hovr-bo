@@ -57,106 +57,86 @@ class MLP(nn.Sequential):
                         f"Activation type '{activation}' is not supported."
                     )
 
-            # # Add activation function for hidden layers
-            # if i < len(self.dimensions) - 2:
-            #     if activation == "tanh":
-            #         self.add_module(f"tanh{i}", nn.Tanh())
-            #     elif activation == "relu":
-            #         self.add_module(f"relu{i}", nn.ReLU())
-            #     elif activation == "elu":
-            #         self.add_module(f"elu{i}", nn.ELU())
-            #     else:
-            #         raise NotImplementedError(
-            #             f"Activation type '{activation}' is not supported."
-            #         )
 
-
-class RegNet(torch.nn.Sequential):
-    def __init__(self, dimensions, activation, input_dim=1, output_dim=1,
-                        dtype=torch.float64, device="cpu"):
-        super(RegNet, self).__init__()
-        self.dimensions = [input_dim, *dimensions, output_dim]
-        for i in range(len(self.dimensions) - 1):
-            self.add_module('linear%d' % i, torch.nn.Linear(
-                self.dimensions[i], self.dimensions[i + 1], dtype=dtype, device=device)
-            )
-            if i < len(self.dimensions) - 2:
-                if activation == "tanh":
-                    self.add_module('tanh%d' % i, torch.nn.Tanh())
-                elif activation == "relu":
-                    self.add_module('relu%d' % i, torch.nn.ReLU())
-                elif activation == "elu":
-                    self.add_module('elu%d' % i, torch.nn.ELU())
-                else:
-                    raise NotImplementedError("Activation type %s is not supported" % activation)
-                
-
-def augmented_and_regularized_trimmed_loss(
-    model, X_tensor, y_tensor, h=None, lambd=1e-3, k=(1, 2), q=2, M=10
-):
+def trimmed_loss_fn(model, X_tensor, y_tensor, h=None):
     """
-    Compute the Augmented and Regularized Trimmed Loss (ARTL) with HOVR regularization.
-    Automatically generates and uses xi (trimmed residual parameter).
-
+    Compute the Trimmed Loss.
+    
     Parameters:
-    - model: Neural network model.
-    - X_tensor: Input data (torch.Tensor).
-    - y_tensor: Target data (torch.Tensor).
-    - h (int, optional): Number of points to keep after trimming. Defaults to 90% of data points.
-    - lambd (float, optional): Regularization strength for HOVR term (default: 1e-3).
-    - k (tuple, optional): Tuple or list of derivative orders to include in HOVR (default: (1, 2)).
-    - q (int, optional): Exponent in HOVR (default: 2).
-    - M (int, optional): Number of random points for HOVR evaluation (default: 10).
-
+    - model: Neural network model
+    - X_tensor: Input data (torch.Tensor)
+    - y_tensor: Target data (torch.Tensor) 
+    - h: Number of points to keep after trimming (default: 90% of data)
+    
     Returns:
-    - total_loss: Computed augmented trimmed loss.
+    - trim_loss: Computed trimmed loss
     """
-    # Default value for h if not provided
     if h is None or h >= X_tensor.shape[0]:
-        h = int(0.9 * X_tensor.shape[0])  # 90% of the data points
+        h = int(0.9 * X_tensor.shape[0])
 
-    print(f"h: {h}, n: {X_tensor.shape[0]}")
+    xi = nn.Parameter(torch.zeros(X_tensor.shape[0], 1), requires_grad=True)
+    preds = model(X_tensor)
+    residuals = (y_tensor - preds).view(-1, 1)
+    loss_fit = (1 / X_tensor.shape[0]) * torch.sum((residuals - xi) ** 2)
+    xi_squared = xi.view(-1) ** 2
+    T_h_xi = (1 / X_tensor.shape[0]) * torch.sum(torch.topk(xi_squared, h, largest=False)[0])
+    
+    return loss_fit + T_h_xi
 
-    # TTL computation
-    if lambd < 1:  # Compute TTL only if tradeoff is not 1
-        xi = nn.Parameter(torch.zeros(X_tensor.shape[0], 1), requires_grad=True)
-        preds = model(X_tensor)
-        residuals = (y_tensor - preds).view(-1, 1)
-        loss_fit = (1 / X_tensor.shape[0]) * torch.sum((residuals - xi) ** 2)
-        xi_squared = xi.view(-1) ** 2
-        T_h_xi = (1 / X_tensor.shape[0]) * torch.sum(torch.topk(xi_squared, h, largest=False)[0])
-        ttl_loss = loss_fit + T_h_xi
-    else:
-        ttl_loss = 0  # Skip TTL computation if tradeoff is 1
 
-    # HOVR computation
-    if lambd > 0:  # Compute HOVR only if tradeoff is not 0
-        x_min, x_max = X_tensor.min(0)[0], X_tensor.max(0)[0]
-        random_points = torch.tensor(
-            np.random.uniform(x_min.numpy(), x_max.numpy(), (M, X_tensor.shape[1])),
-            dtype=torch.double, requires_grad=True
-        )
-        preds_random = model(random_points)
-        grads = torch.autograd.grad(preds_random, random_points, torch.ones_like(preds_random), create_graph=True)[0]
+def hovr_loss_fn(model, X_tensor, _, k=(1, 2), q=2, M=10):
+    """
+    Compute the HOVR Loss.
+    
+    Parameters:
+    - model: Neural network model
+    - X_tensor: Input data (torch.Tensor)
+    - k: Tuple of derivative orders (default: (1, 2))
+    - q: Exponent in HOVR (default: 2)
+    - M: Number of random points (default: 10)
+    
+    Returns:
+    - hovr_loss: Computed HOVR loss
+    """
+    x_min, x_max = X_tensor.min(0)[0], X_tensor.max(0)[0]
 
-        hovr_term = 0.0
-        n_dims = X_tensor.shape[1]
+    # Generate random points in PyTorch with proper gradient tracking
+    random_points = torch.rand((M, X_tensor.shape[1]), dtype=torch.double, device=X_tensor.device, requires_grad=True)
+    random_points = random_points * (x_max - x_min) + x_min
 
-        for order in k:  # Iterate over specified derivative orders
-            temp_grads = grads
-            for _ in range(order - 1):  # Compute higher-order derivatives
-                temp_grads = torch.autograd.grad(temp_grads, random_points, torch.ones_like(temp_grads),
-                                                 create_graph=True)[0]
-            # Accumulate HOVR terms
-            hovr_term += (1 / n_dims) * torch.sum(torch.abs(temp_grads) ** q)
+    preds_random = model(random_points)
 
-        hovr_loss = hovr_term
-    else:
-        hovr_loss = 0  # Skip HOVR computation if tradeoff is 0
 
-    # Combine TTL and HOVR with tradeoff
-    total_loss = ttl_loss + lambd * hovr_loss
-    return total_loss
+    print()
+    print()
+    print()
+    print(f"random_points.requires_grad: {random_points.requires_grad}")
+    print(f"preds_random.requires_grad: {preds_random.requires_grad}")
+    print(f"preds_random.grad_fn: {preds_random.grad_fn}")
+    print()
+    print()
+    print()
+
+
+
+    # First-order gradients
+    grads = torch.autograd.grad(
+        preds_random, random_points, torch.ones_like(preds_random), create_graph=True
+    )[0]
+
+    hovr_term = 0.0
+    n_dims = X_tensor.shape[1]
+
+    # Compute higher-order gradients for each order in k
+    for order in k:
+        temp_grads = grads
+        for _ in range(order - 1):
+            temp_grads = torch.autograd.grad(
+                temp_grads, random_points, torch.ones_like(temp_grads), create_graph=True
+            )[0]
+        hovr_term += (1 / n_dims) * torch.sum(torch.abs(temp_grads) ** q)
+
+    return hovr_term
 
 
 class EarlyStopping:

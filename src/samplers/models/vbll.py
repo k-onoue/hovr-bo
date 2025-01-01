@@ -121,6 +121,10 @@ class VBLLModel(Model):
             wishart_scale=wishart_scale,
         )
 
+    @property
+    def num_outputs(self) -> int:
+        return self.output_dim
+
     def forward(self, x: torch.Tensor) -> torch.distributions.Normal:
         """
         Perform a forward pass through the network.
@@ -132,7 +136,7 @@ class VBLLModel(Model):
             vbll.VBLLReturn: Predictive distribution and loss functions from VBLL.
         """
         return self.nn(x)
-    
+
     def posterior(
         self,
         X: Tensor,
@@ -148,10 +152,6 @@ class VBLLModel(Model):
         dist = gdists.MultivariateNormal(mean, covariance)
         posterior = GPyTorchPosterior(dist)
         return posterior
-
-    @property
-    def num_outputs(self) -> int:
-        return self.output_dim
 
     def loss_fn(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         return self.forward(x).train_loss_fn(y)
