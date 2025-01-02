@@ -1,0 +1,23 @@
+{
+    "surrogate": "llla_artl",
+    "acqf": "log_ei",
+    "sampler_args": {
+        "surrogate_args": {
+            "dimensions": [128, 128, 128],
+            "regnet_activation": "tanh"
+        },
+        "optim_args": {
+            "epochs": 10000,
+            "loss_coeffs": {
+                "mse": 1,
+                "trim": 1e-1,
+                "hovr": 0
+            },
+            "loss_params": {
+                "k": [3],
+                "q": 1,
+                "M": 2
+            }
+        }
+    }
+}

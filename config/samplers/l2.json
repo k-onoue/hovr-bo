@@ -1,0 +1,14 @@
+{
+    "surrogate": "llla_l2",
+    "acqf": "log_ei",
+    "sampler_args": {
+        "surrogate_args": {
+            "dimensions": [128, 128, 128],
+            "regnet_activation": "tanh"
+        },
+        "optim_args": {
+            "epochs": 10000,
+            "weight_decay": 1e-3
+        }
+    }
+}

@@ -252,3 +252,4 @@ class VBLLModel(Model):
                 early_stopping(val_loss, self)
                 if early_stopping.early_stop:
                     break
+

@@ -3,7 +3,7 @@ import os
 import sys
 from logging.handlers import RotatingFileHandler
 
-from .samplers import (DAPARTLSampler, DAPL2Sampler, GPSampler,
+from .samplers import (GPSampler,
                        LastLaplaceARTLSampler, LastLaplaceL2Sampler,
                        LastVBSampler)
 from .test_functions import (Ackley2d, Ackley5d, BraninFoo, Hartmann6d,
@@ -75,10 +75,6 @@ def get_sampler(name):
         return LastLaplaceL2Sampler
     elif name == "llla_artl":
         return LastLaplaceARTLSampler
-    elif name == "dap_l2":
-        return DAPL2Sampler
-    elif name == "dap_artl":
-        return DAPARTLSampler
     else:
         raise ValueError(f"Surrogate model {name} not recognized.")
     

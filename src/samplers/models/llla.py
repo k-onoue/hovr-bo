@@ -45,22 +45,59 @@ class LaplaceModel(Model):
 
     def forward(self, X: Tensor) -> Tensor:
         mean, covariance = self.bnn(X, joint=True)
-        mean = mean.reshape(*mean.shape[:-1], -1, self.output_dim)
         return mean, covariance
     
     def posterior(
-        self, 
+        self,
         X: Tensor,
         output_indices: Optional[list[int]] = None,
         observation_noise: bool = False,
         posterior_transform: Optional[Callable[[Posterior], Posterior]] = None,
         **kwargs: Any,
     ) -> Posterior:
+        """
+        Compute the posterior predictive distribution.
+
+        Args:
+            X: Input tensor of shape (batch_shape, q, d) or (batch_shape*q, d).
+            output_indices: List of output indices to consider (not used in this example).
+            observation_noise: Flag for including observation noise (not implemented here).
+            posterior_transform: Optional transformation to apply to the posterior.
+            **kwargs: Additional arguments for customization.
+
+        Returns:
+            Posterior: GPyTorchPosterior object encapsulating the posterior predictive.
+        """
+        # Determine input shape and reshape if needed
+        if len(X.shape) < 3:
+            B, D = X.shape
+            Q = 1
+        else:
+            B, Q, D = X.shape
+            X = X.reshape(B * Q, D)
+
+        # Generate predictions (mean and covariance)
         mean, covariance = self.forward(X)
-        dist = gdists.MultivariateNormal(mean, covariance)
+
+        # Reshape mean to (B, Q * output_dim)
+        mean = mean.reshape(B, Q * self.output_dim)
+
+        # Add jitter to covariance matrix for numerical stability
+        jitter = 1e-4 * torch.eye(covariance.shape[-1], device=covariance.device, dtype=covariance.dtype)
+        covariance += jitter
+
+        # Reshape covariance for batched processing
+        K = self.output_dim
+        covariance = covariance.reshape(B, Q, K, B, Q, K)
+        covariance = torch.einsum('bqkbrl->bqkrl', covariance)  # Reshape to (B, Q, K, Q, K)
+        covariance = covariance.reshape(B, Q * K, Q * K)
+
+        # Create a multivariate normal distribution
+        dist = gdists.MultivariateNormal(mean, covariance_matrix=covariance)
         posterior = GPyTorchPosterior(dist)
+
         return posterior
-    
+
     def loss_fn(
         self,
         x: Tensor,
@@ -323,7 +360,7 @@ class LaplaceModel(Model):
 #     config = {
 #         "batch_size": 16,
 #         "epochs": 5000,
-#         "prior_precision": 1e-2, # too small prior precision can lead to numerical instability
+#         "prior_precision": 1, # too small prior precision can lead to numerical instability
 #         "sigma_noise": 1e-1,
 #         "loss_coeffs": {"mse": 1, "trim": 1e-1, "hovr": 1e-3},
 #     }
@@ -333,8 +370,19 @@ class LaplaceModel(Model):
 
 #     # Predict
 #     X_test = torch.linspace(-6, 6, 200).reshape(-1, 1).to(torch.float64)
+#     # temp = model.posterior(X_test)
+#     # print(temp)
+
+
 #     with torch.no_grad():
 #         y_pred, covariance = model.forward(X_test)
+#         jitter = torch.eye(covariance.shape[0]) * 1e-4
+#         covariance += jitter
+#         temp = torch.linalg.cholesky(covariance)
+
+#         print(temp)
+
+#         print(covariance)
 
 #     # Convert to numpy for plotting
 #     X_test_np = X_test.numpy()

@@ -1,11 +1,18 @@
 #!/bin/bash
 
 # Experiment settings
-SEEDS=(0)
+SEEDS=(0 1 2)
 EXPERIMENT_SCRIPT="run_bo.py"
-SETTINGS_FILE="test.json"
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 SCRIPT_NAME=$(basename "${SCRIPT_PATH}")
+
+# Check if SETTINGS_FILE is passed as an argument
+if [ $# -lt 2 ]; then
+    echo "Usage: $SCRIPT_NAME <problem_settings_file> <sampler_settings_file>"
+    exit 1
+fi
+PROBLEM_SETTINGS_FILE=$1
+SAMPLER_SETTINGS_FILE=$2
 
 # Generate timestamp (format: YYYY-MM-DD_HH-mm-ss)
 TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
@@ -14,13 +21,15 @@ TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
 RESULTS_DIR="results/${TIMESTAMP}"
 mkdir -p "${RESULTS_DIR}"
 cp "${SCRIPT_PATH}" "${RESULTS_DIR}/"
-cp "config/${SETTINGS_FILE}" "${RESULTS_DIR}/"
+cp "config/problems/${PROBLEM_SETTINGS_FILE}" "${RESULTS_DIR}/"
+cp "config/samplers/${SAMPLER_SETTINGS_FILE}" "${RESULTS_DIR}/"
 
 # Define run function
 run_experiment() {
     local seed=$1
     python3 "experiments/${EXPERIMENT_SCRIPT}" \
-        --settings "config/${SETTINGS_FILE}" \
+        --problem "config/problems/${PROBLEM_SETTINGS_FILE}" \
+        --sampler "config/samplers/${SAMPLER_SETTINGS_FILE}" \
         --timestamp "${TIMESTAMP}" \
         --seed "${seed}"
 }

@@ -61,7 +61,7 @@ class LastLaplaceL2Sampler(RelativeSampler):
         )
         
         self.surrogate = self._initialize_laplace(
-            kwargs.get("model_args", {})
+            kwargs.get("surrogate_args", {})
         )
 
         self.acquisition = get_acquisition_function(acqf_name)
@@ -73,11 +73,11 @@ class LastLaplaceL2Sampler(RelativeSampler):
             "hovr": 0.0,
         }
 
-    def _initialize_laplace(self, model_args: dict) -> LaplaceModel:
+    def _initialize_laplace(self, surrogate_args: dict) -> LaplaceModel:
 
         return LaplaceModel(
-            dimensions=model_args.get("dimensions", [128, 128, 128]),
-            activation=model_args.get("activation", "tanh"),
+            dimensions=surrogate_args.get("dimensions", [128, 128, 128]),
+            activation=surrogate_args.get("activation", "tanh"),
             input_dim=self.bounds.shape[1],
             output_dim=1,
             dtype=self.dtype,
@@ -180,18 +180,17 @@ class LastLaplaceARTLSampler(RelativeSampler):
 
         # Extract optimization configuration
         self.optim_config = kwargs.get("optim_args", {})
+
+        self.optim_config["weight_decay"] = 0.0
         self._validate_config()
 
         # Initialize surrogate model
         self.surrogate = self._initialize_laplace(
-            kwargs.get("model_args", {})
+            kwargs.get("surrogate_args", {})
         )
 
         # Initialize acquisition function
         self.acquisition = get_acquisition_function(acqf_name)
-
-        # Store additional configurations
-        self.optim_config = kwargs.get("optim_args", {})
 
     def _validate_config(self):
         """Validate the optimization configuration."""
@@ -208,11 +207,11 @@ class LastLaplaceARTLSampler(RelativeSampler):
                 "At least one of 'trim' or 'hovr' coefficients must be greater than 0."
             )
 
-    def _initialize_laplace(self, model_args: dict) -> LaplaceModel:
+    def _initialize_laplace(self, surrogate_args: dict) -> LaplaceModel:
 
         return LaplaceModel(
-            dimensions=model_args.get("dimensions", [128, 128, 128]),
-            activation=model_args.get("activation", "tanh"),
+            dimensions=surrogate_args.get("dimensions", [128, 128, 128]),
+            activation=surrogate_args.get("activation", "tanh"),
             input_dim=self.bounds.shape[1],
             output_dim=1,
             dtype=self.dtype,

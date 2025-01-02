@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 import os
 
 import torch
@@ -69,6 +70,7 @@ class Experiment:
             acqf_name=acqf_name,  # Updated parameter
             seed=seed,
             sampler_args=sampler_args,
+
         )
 
         bo.run()
@@ -86,16 +88,28 @@ class Experiment:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--settings", type=str, required=True, help="Path to settings JSON file")
+    parser.add_argument("--problem", type=str, required=True, help="Path to task JSON file")
+    parser.add_argument("--sampler", type=str, required=True, help="Path to sampler JSON file")
     parser.add_argument("--timestamp", type=str, required=True, help="Timestamp for the experiment")
     parser.add_argument("--seed", type=int, default=0, help="Seed for the experiment")
     args = parser.parse_args()
 
-    with open(args.settings, "r") as f:
-        settings = json.load(f)
+    with open(args.problem, "r") as f:
+        problem_config = json.load(f)
+    
+    with open(args.sampler, "r") as f:
+        sampler_config = json.load(f)
+    
+    settings = problem_config
+    settings["sampler"] = sampler_config
 
+    settings["seed"] = args.seed
     experiment = Experiment(settings)
     base_script_name = os.path.splitext(os.path.basename(__file__))[0]
     results_dir = os.path.join("results", args.timestamp)
     os.makedirs(results_dir, exist_ok=True)
+
+    set_logger(base_script_name, results_dir)
+    logging.info(f"Running experiment with settings: {settings}")
+
     experiment.run(save_dir=results_dir)

@@ -179,3 +179,4 @@ class EarlyStopping:
         if self.verbose:
             self.trace_func(f'Validation loss decreased ({self.best_val_loss:.6f} --> {val_loss:.6f}). Saving model state...')
         self.best_model_state = model.state_dict()  # Save the model state in memory
+
