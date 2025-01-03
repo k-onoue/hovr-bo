@@ -1,3 +1,6 @@
+import logging
+from functools import partial
+
 import torch
 from botorch.optim import optimize_acqf
 from botorch.sampling import SobolQMCNormalSampler
@@ -37,27 +40,55 @@ class LastVBSampler(RelativeSampler):
         )
         
         self.surrogate = self._initialize_vbll(
-            kwargs.get("model_args", {})
+            kwargs.get("surrogate_args", {})
         )
-        self.acquisition = get_acquisition_function(acqf_name)
+
+        self.acqf_name = acqf_name
 
         self.optim_config = kwargs.get("optim_args", {})
 
-    def _initialize_vbll(self, model_args: dict) -> VBLLModel:
+        logging.info(kwargs.get("surrogate_args", {}))
+        logging.info(self.optim_config)
+
+    def _initialize_vbll(self, surrogate_args: dict) -> VBLLModel:
 
         return VBLLModel(
-            dimensions=model_args.get("dimensions", [128, 128, 128]),
-            activation=model_args.get("activation", "tanh"),
+            dimensions=surrogate_args.get("dimensions", [128, 128, 128]),
+            activation=surrogate_args.get("activation", "tanh"),
             input_dim=self.bounds.shape[1],
             output_dim=1,
             dtype=self.dtype,
             device=self.device,
-            reg_weight=model_args.get("reg_weight", 1.0),
-            parameterization=model_args.get("parameterization", "dense"),
-            prior_scale=model_args.get("prior_scale", 1.0),
-            wishart_scale=model_args.get("wishart_scale", 0.1),
+            reg_weight=surrogate_args.get("reg_weight", 1.0),
+            parameterization=surrogate_args.get("parameterization", "dense"),
+            prior_scale=surrogate_args.get("prior_scale", 1.0),
+            wishart_scale=surrogate_args.get("wishart_scale", 0.1),
         )
 
+    def _initialize_acquisition(
+        self,
+        train_X: torch.Tensor,
+        train_Y: torch.Tensor    
+    ) -> callable:
+        acqf_class = get_acquisition_function(self.acqf_name)
+
+        base_acqf = partial(
+            acqf_class, 
+            model=self.surrogate, 
+            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([1024]))
+        )
+
+        if self.acqf_name == "log_ei":
+            acquisition_function = base_acqf(best_f=train_Y.max())
+        elif self.acqf_name == "log_nei":
+            acquisition_function = base_acqf(X_baseline=train_X)
+        elif self.acqf_name == "ucb":
+            acquisition_function = base_acqf(beta=0.1)
+        else:
+            raise NotImplementedError(f"Acquisition function '{self.acqf_name}' is not supported.")
+
+        return acquisition_function
+    
     def _sample(
         self, 
         train_X: torch.Tensor, 
@@ -67,14 +98,8 @@ class LastVBSampler(RelativeSampler):
 
         self.surrogate.fit(train_X, train_Y, config=self.optim_config)
 
-        acquisition_function = self.acquisition(
-            model=self.surrogate,
-            best_f=train_Y.max(),
-            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([1024])),
-        )
-
         candidates, _ = optimize_acqf(
-            acq_function=acquisition_function,
+            acq_function=self._initialize_acquisition(train_X, train_Y),
             bounds=bounds,
             q=self.batch_size,
             num_restarts=10,

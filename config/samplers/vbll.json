@@ -1,4 +1,28 @@
 {
     "surrogate": "vbll",
-    "acqf": "log_ei"
+    "acqf": "log_nei",
+    "sampler_args": {
+        "surrogate_args": {
+            "dimensions": [128, 128, 128],
+            "activation": "tanh",
+            "reg_weight": 1.0,
+            "parameterization": "dense",
+            "prior_scale": 1.0,
+            "wishart_scale": 0.1,
+            "temperature": 2.0
+        },
+        "optim_args": {
+            "batch_size": 32,
+            "val_split": 0.2,
+            "min_train_size": 5,
+            "lr": 0.001,
+            "weight_decay_hidden": 0.001,
+            "weight_decay_last": 0,
+            "weight_decay": 0,
+            "epochs": 10000,
+            "patience": 20,
+            "verbose": true,
+            "delta": 0
+        }
+    }
 }

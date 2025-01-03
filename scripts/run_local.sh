@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Experiment settings
-SEEDS=(0 1 2)
+SEEDS=(0)
 EXPERIMENT_SCRIPT="run_bo.py"
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 SCRIPT_NAME=$(basename "${SCRIPT_PATH}")

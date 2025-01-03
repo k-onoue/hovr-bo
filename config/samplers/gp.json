@@ -1,4 +1,4 @@
 {
     "surrogate": "gp",
-    "acqf": "log_ei"
+    "acqf": "log_nei"
 }

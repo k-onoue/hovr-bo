@@ -1,3 +1,5 @@
+from functools import partial
+
 import torch
 from botorch.models import SingleTaskGP
 from botorch.fit import fit_gpytorch_mll
@@ -38,26 +40,46 @@ class GPSampler(RelativeSampler):
         )
         
         self.surrogate = SingleTaskGP
-        self.acquisition = get_acquisition_function(acqf_name)
+        self.acqf_name = acqf_name
+    
+    def _initialize_acquisition(
+        self,
+        train_X: torch.Tensor,
+        train_Y: torch.Tensor,
+        model: SingleTaskGP,    
+    ) -> callable:
+        acqf_class = get_acquisition_function(self.acqf_name)
 
+        base_acqf = partial(
+            acqf_class, 
+            model=model, 
+            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([1024]))
+        )
+
+        if self.acqf_name == "log_ei":
+            acquisition_function = base_acqf(best_f=train_Y.max())
+        elif self.acqf_name == "log_nei":
+            acquisition_function = base_acqf(X_baseline=train_X)
+        elif self.acqf_name == "ucb":
+            acquisition_function = base_acqf(beta=0.1)
+        else:
+            raise NotImplementedError(f"Acquisition function '{self.acqf_name}' is not supported.")
+
+        return acquisition_function
+    
     def _sample(
         self, 
         train_X: torch.Tensor, 
         train_Y: torch.Tensor, 
         bounds: torch.Tensor
     ) -> torch.Tensor:
+
         model = self.surrogate(train_X, train_Y)
         mll = ExactMarginalLogLikelihood(model.likelihood, model)
         fit_gpytorch_mll(mll)
 
-        acquisition_function = self.acquisition(
-            model=model,
-            best_f=train_Y.max(),
-            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([1024])),
-        )
-
         candidates, _ = optimize_acqf(
-            acq_function=acquisition_function,
+            acq_function=self._initialize_acquisition(train_X, train_Y, model),
             bounds=bounds,
             q=self.batch_size,
             num_restarts=10,

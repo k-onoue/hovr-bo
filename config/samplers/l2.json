@@ -1,14 +1,26 @@
 {
     "surrogate": "llla_l2",
-    "acqf": "log_ei",
+    "acqf": "log_nei",
     "sampler_args": {
         "surrogate_args": {
             "dimensions": [128, 128, 128],
-            "regnet_activation": "tanh"
+            "activation": "tanh"
         },
         "optim_args": {
+            "batch_size": 32,
+            "val_split": 0.2,
+            "min_train_size": 5,
+            "lr": 0.001,
+            "weight_decay_hidden": 0.001,
+            "weight_decay_last": 0.001,
             "epochs": 10000,
-            "weight_decay": 1e-3
+            "patience": 20,
+            "verbose": true,
+            "delta": 0,
+            "hessian_structure": "full",
+            "prior_precision": 0.01,
+            "sigma_noise": 0.1,
+            "temperature": 1
         }
     }
 }

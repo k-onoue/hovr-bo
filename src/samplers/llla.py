@@ -1,3 +1,6 @@
+import logging
+from functools import partial
+
 import torch
 from botorch.optim import optimize_acqf
 from botorch.sampling import SobolQMCNormalSampler
@@ -36,8 +39,9 @@ class LastLaplaceL2Sampler(RelativeSampler):
             # Optimization
             "optimizer": torch.optim.Adam,  # Optimizer class
             "lr": 1e-3,                    # Learning rate
-            "weight_decay": 0,             # Weight decay for non-VBLL layers
-            "epochs": 1000,                 # Number of training epochs
+            "weight_decay_hidden": 0,      # Weight decay for non-output layer weights
+            "weight_decay_last": 0,        # Weight decay for output layer weights
+            "epochs": 1000,                # Number of training epochs
 
             # Early Stopping
             "patience": 20,           # Number of epochs to wait for improvement
@@ -64,7 +68,7 @@ class LastLaplaceL2Sampler(RelativeSampler):
             kwargs.get("surrogate_args", {})
         )
 
-        self.acquisition = get_acquisition_function(acqf_name)
+        self.acqf_name = acqf_name
 
         self.optim_config = kwargs.get("optim_args", {})
         self.optim_config["loss_coeffs"] = {
@@ -72,6 +76,9 @@ class LastLaplaceL2Sampler(RelativeSampler):
             "trim": 0.0,
             "hovr": 0.0,
         }
+
+        logging.info(kwargs.get("surrogate_args", {}))
+        logging.info(self.optim_config)
 
     def _initialize_laplace(self, surrogate_args: dict) -> LaplaceModel:
 
@@ -84,6 +91,30 @@ class LastLaplaceL2Sampler(RelativeSampler):
             device=self.device
         )
     
+    def _initialize_acquisition(
+        self,
+        train_X: torch.Tensor,
+        train_Y: torch.Tensor    
+    ) -> callable:
+        acqf_class = get_acquisition_function(self.acqf_name)
+
+        base_acqf = partial(
+            acqf_class, 
+            model=self.surrogate, 
+            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([1024]))
+        )
+
+        if self.acqf_name == "log_ei":
+            acquisition_function = base_acqf(best_f=train_Y.max())
+        elif self.acqf_name == "log_nei":
+            acquisition_function = base_acqf(X_baseline=train_X)
+        elif self.acqf_name == "ucb":
+            acquisition_function = base_acqf(beta=0.1)
+        else:
+            raise NotImplementedError(f"Acquisition function '{self.acqf_name}' is not supported.")
+
+        return acquisition_function
+    
     def _sample(
         self, 
         train_X: torch.Tensor, 
@@ -93,14 +124,8 @@ class LastLaplaceL2Sampler(RelativeSampler):
 
         self.surrogate.fit(train_X, train_Y, config=self.optim_config)
 
-        acquisition_function = self.acquisition(
-            model=self.surrogate,
-            best_f=train_Y.max(),
-            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([1024])),
-        )
-
         candidates, _ = optimize_acqf(
-            acq_function=acquisition_function,
+            acq_function=self._initialize_acquisition(train_X, train_Y),
             bounds=bounds,
             q=self.batch_size,
             num_restarts=10,
@@ -139,8 +164,9 @@ class LastLaplaceARTLSampler(RelativeSampler):
             # Optimization
             "optimizer": torch.optim.Adam,  # Optimizer class
             "lr": 1e-3,                    # Learning rate
-            "weight_decay": 0,             # Weight decay for non-VBLL layers
-            "epochs": 1000,                 # Number of training epochs
+            "weight_decay_hidden": 0,      # Weight decay for non-output layer weights
+            "weight_decay_last": 0,        # Weight decay for output layer weights
+            "epochs": 1000,                # Number of training epochs
 
             # Loss coefficients
             "loss_coeffs": {
@@ -181,7 +207,6 @@ class LastLaplaceARTLSampler(RelativeSampler):
         # Extract optimization configuration
         self.optim_config = kwargs.get("optim_args", {})
 
-        self.optim_config["weight_decay"] = 0.0
         self._validate_config()
 
         # Initialize surrogate model
@@ -190,7 +215,10 @@ class LastLaplaceARTLSampler(RelativeSampler):
         )
 
         # Initialize acquisition function
-        self.acquisition = get_acquisition_function(acqf_name)
+        self.acqf_name = acqf_name
+
+        logging.info(kwargs.get("surrogate_args", {}))
+        logging.info(self.optim_config)
 
     def _validate_config(self):
         """Validate the optimization configuration."""
@@ -218,6 +246,30 @@ class LastLaplaceARTLSampler(RelativeSampler):
             device=self.device
         )
     
+    def _initialize_acquisition(
+        self,
+        train_X: torch.Tensor,
+        train_Y: torch.Tensor    
+    ) -> callable:
+        acqf_class = get_acquisition_function(self.acqf_name)
+
+        base_acqf = partial(
+            acqf_class, 
+            model=self.surrogate, 
+            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([1024]))
+        )
+
+        if self.acqf_name == "log_ei":
+            acquisition_function = base_acqf(best_f=train_Y.max())
+        elif self.acqf_name == "log_nei":
+            acquisition_function = base_acqf(X_baseline=train_X)
+        elif self.acqf_name == "ucb":
+            acquisition_function = base_acqf(beta=0.1)
+        else:
+            raise NotImplementedError(f"Acquisition function '{self.acqf_name}' is not supported.")
+
+        return acquisition_function
+    
     def _sample(
         self, 
         train_X: torch.Tensor, 
@@ -227,14 +279,8 @@ class LastLaplaceARTLSampler(RelativeSampler):
 
         self.surrogate.fit(train_X, train_Y, config=self.optim_config)
 
-        acquisition_function = self.acquisition(
-            model=self.surrogate,
-            best_f=train_Y.max(),
-            sampler=SobolQMCNormalSampler(sample_shape=torch.Size([1024])),
-        )
-
         candidates, _ = optimize_acqf(
-            acq_function=acquisition_function,
+            acq_function=self._initialize_acquisition(train_X, train_Y),
             bounds=bounds,
             q=self.batch_size,
             num_restarts=10,

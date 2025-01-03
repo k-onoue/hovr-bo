@@ -172,7 +172,8 @@ class VBLLModel(Model):
             # Optimization
             "optimizer": torch.optim.Adam,  # Optimizer class
             "lr": 1e-3,                    # Learning rate
-            "weight_decay": 0,             # Weight decay for non-VBLL layers
+            "weight_decay_hidden": 0,      # Weight decay for non-output layer weights
+            "weight_decay_last": 0,        # Weight decay for output layer weights
             "epochs": 100,                 # Number of training epochs
 
             # Early Stopping
@@ -221,7 +222,7 @@ class VBLLModel(Model):
                 non_out_layer_params.append(param)
 
         param_list = [
-            {"params": non_out_layer_params, "weight_decay": config.get("weight_decay", 0)},
+            {"params": non_out_layer_params, "weight_decay": config.get("weight_decay_hidden", 0)},
             {"params": out_layer_params, "weight_decay": 0},
         ]
 

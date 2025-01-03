@@ -1,16 +1,16 @@
 {
     "device": "cpu",
     "dtype": "float64",
-    "n_initial_eval": 3,
-    "initial_sample_method": "sobol", 
+    "n_initial_eval": 5,
+    "initial_sample_method": "random", 
     "n_iter": 20,
     "batch_size": 3,
     "is_maximize": false,
     "objective": {
-        "function": "synthetic",
+        "function": "branin",
         "noise_std": 1.0,
         "outlier_prob": 0.1,
-        "outlier_scale": 10.0,
+        "outlier_scale": 3.0,
         "outlier_std": 1.0
     }
 }

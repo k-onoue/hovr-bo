@@ -28,10 +28,10 @@ class MLP(nn.Sequential):
         """
         super(MLP, self).__init__()
 
-        # Combine input, hidden, and output dimensions
-        self.dimensions: list[int] = [input_dim, *dimensions, output_dim]
+        # Store dimensions for all layers
+        self.dimensions = [input_dim, *dimensions]  # Exclude output_dim
 
-        # Loop to create layers
+        # Create hidden layers
         for i in range(len(self.dimensions) - 1):
             # Add linear layer
             self.add_module(
@@ -44,18 +44,31 @@ class MLP(nn.Sequential):
                 ),
             )
 
-            # Add activation function for hidden layers
-            if i < len(self.dimensions) - 2:
-                if activation == "tanh":
-                    self.add_module(f"activation{i}", nn.Tanh())
-                elif activation == "relu":
-                    self.add_module(f"activation{i}", nn.ReLU())
-                elif activation == "elu":
-                    self.add_module(f"activation{i}", nn.ELU())
-                else:
-                    raise NotImplementedError(
-                        f"Activation type '{activation}' is not supported."
-                    )
+            # Add activation function
+            if activation == "tanh":
+                self.add_module(f"activation{i}", nn.Tanh())
+            elif activation == "relu":
+                self.add_module(f"activation{i}", nn.ReLU())
+            elif activation == "elu":
+                self.add_module(f"activation{i}", nn.ELU())
+            else:
+                raise NotImplementedError(
+                    f"Activation type '{activation}' is not supported."
+                )
+        
+        # Add output layer
+        self.add_module(
+            "out_layer", 
+            nn.Linear(self.dimensions[-1], output_dim, dtype=dtype, device=device)
+        )
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass through the model.
+        """
+        for _, module in self.named_children():
+            x = module(x)
+        return x
 
 
 def trimmed_loss_fn(model, X_tensor, y_tensor, h=None):

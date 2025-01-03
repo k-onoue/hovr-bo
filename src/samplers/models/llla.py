@@ -161,8 +161,9 @@ class LaplaceModel(Model):
             # Optimization
             "optimizer": torch.optim.Adam,  # Optimizer class
             "lr": 1e-3,                    # Learning rate
-            "weight_decay": 0,             # Weight decay for non-VBLL layers
-            "epochs": 1000,                 # Number of training epochs
+            "weight_decay_hidden": 0,      # Weight decay for non-output layer weights
+            "weight_decay_last": 0,        # Weight decay for output layer weights
+            "epochs": 1000,                # Number of training epochs
 
             # Loss coefficients
             "loss_coeffs": {
@@ -246,17 +247,13 @@ class LaplaceModel(Model):
             val_loader = None  # No validation
             early_stopping = None  # EarlyStopping not applied
 
-        weight_decay = config.get("weight_decay", 0)
+        weight_decay_hidden = config.get("weight_decay_hidden", 0)
+        weight_decay_last = config.get("weight_decay_last", 0)
 
         loss_coeffs = config.get("loss_coeffs", {})
         mse_coeff = loss_coeffs.get("mse", 1)
         trim_coeff = loss_coeffs.get("trim", 0)
         hovr_coeff = loss_coeffs.get("hovr", 0)
-        total_coeff = mse_coeff + trim_coeff + hovr_coeff + weight_decay
-        mse_coeff /= total_coeff
-        trim_coeff /= total_coeff
-        hovr_coeff /= total_coeff
-        weight_decay /= total_coeff
 
         loss_params = config.get("loss_params", {})
         h = loss_params.get("h", None)
@@ -273,8 +270,8 @@ class LaplaceModel(Model):
                 non_out_layer_params.append(param)
 
         param_list = [
-            {"params": non_out_layer_params, "weight_decay": weight_decay},
-            {"params": out_layer_params, "weight_decay": 0},
+            {"params": non_out_layer_params, "weight_decay_hidden": weight_decay_hidden},
+            {"params": out_layer_params, "weight_decay_last": weight_decay_last},
         ]
 
         optimizer_class = config.get("optimizer", torch.optim.Adam)
