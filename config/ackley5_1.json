@@ -1,13 +1,13 @@
 {
     "device": "cpu",
     "dtype": "float64",
-    "n_initial_eval": 5,
+    "n_initial_eval": 25,
     "initial_sample_method": "random", 
-    "n_iter": 5,
-    "batch_size": 1,
+    "n_iter": 40,
+    "batch_size": 5,
     "is_maximize": false,
     "objective": {
-        "function": "ackley2",
+        "function": "ackley5",
         "noise_std": 1.0,
         "outlier_prob": 0.1,
         "outlier_scale": 3.0,
