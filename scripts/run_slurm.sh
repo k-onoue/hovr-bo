@@ -47,7 +47,7 @@ create_slurm_job() {
 
     cat > "$job_file" << EOF
 #!/bin/bash -l
-#SBATCH --job-name=tf_${sampler_type}_${seed}
+#SBATCH --job-name=bo_${sampler_type}_${seed}
 #SBATCH --output=${RESULTS_DIR}/%x_%j.log
 #SBATCH --partition=cluster_short
 #SBATCH --nodes=1
@@ -73,6 +73,9 @@ for sampler_type in "${SAMPLER_TYPES[@]}"; do
     done
 
 done
+
+# Delete job files
+rm "${RESULTS_DIR}/job_"*
 
 # Create completion file
 COMPLETION_FILE="${RESULTS_DIR}/completion.txt"

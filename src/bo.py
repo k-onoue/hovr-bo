@@ -196,7 +196,7 @@ class BayesianOptimization:
             # Append the new batch to history_df
             self.history_df = pd.concat([self.history_df, df], axis=0).reset_index(drop=True)
 
-    def report(self, max_rows: Optional[int] = None):
+    def report(self, max_rows: Optional[int] = None, save_path: Optional[str] = None):
         if self.history_df is None:
             logging.info("No data to report.")
             return
@@ -264,5 +264,8 @@ class BayesianOptimization:
         fig.update_xaxes(title_text="Iteration", row=1, col=1)
         fig.update_xaxes(title_text="Iteration", row=1, col=2)
 
-        fig.show()
+        if save_path:
+            fig.write_image(save_path)
+        else:
+            fig.show()
 

@@ -69,13 +69,17 @@ class Experiment:
         )
 
         bo.run()
-        bo.report()
 
         _seed = seed
         _obj = self.settings["objective"]["function"]
-        filename = f"{_obj}_{self.sampler_type}_{acqf_name}_{_seed}.csv"
-        filename = os.path.join(save_dir, filename)
-        bo.history_df.to_csv(filename, index=False)
+        filename_csv = f"{_obj}_{self.sampler_type}_{acqf_name}_{_seed}.csv"
+        filepath_csv = os.path.join(save_dir, filename_csv)
+        filename_png = f"{_obj}_{self.sampler_type}_{acqf_name}_{_seed}.png"
+        filepath_png = os.path.join(save_dir, filename_png)
+
+        bo.report(save_path=filepath_png)
+        bo.history_df.to_csv(filepath_csv, index=False)
+        
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
