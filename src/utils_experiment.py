@@ -7,7 +7,7 @@ from .samplers import (GPSampler,
                        LastLaplaceARTLSampler, LastLaplaceL2Sampler,
                        LastVBSampler)
 from .test_functions import (Ackley2d, Ackley5d, BraninFoo, Hartmann6d,
-                             SyntheticSine, PestControl)
+                             SyntheticSine)
 
 
 def set_logger(log_filename_base, save_dir):
@@ -62,8 +62,6 @@ def get_objective_function(name):
         return Ackley2d
     elif name == "ackley5":
         return Ackley5d
-    elif name == "pest":
-        return PestControl
     else:
         raise ValueError(f"Objective function {name} not recognized.")
     
