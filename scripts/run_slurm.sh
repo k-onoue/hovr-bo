@@ -10,7 +10,7 @@
 #SBATCH --time=4:00:00
 
 # Experiment settings
-SEEDS=(0 1)
+SEEDS=(0 1 2 3 4 5 6 7 8 9)
 EXPERIMENT_SCRIPT="run_bo.py"
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 SCRIPT_NAME=$(basename "${SCRIPT_PATH}")
