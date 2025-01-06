@@ -85,7 +85,7 @@ class BayesianOptimization:
         F_new = self.objective_function.evaluate_true(X_new)
         return Y_new, F_new
 
-    def run(self):
+    def run(self, save_path: Optional[str] = None):
         # Initial sampling
         X_init = self.indenpendent_sampler.sample()
         Y_init, F_init = self._evaluate(X_init)
@@ -96,11 +96,10 @@ class BayesianOptimization:
         self.F_all = F_init
 
         # Record initial data
-        self._record("independent")
+        self._record("independent", save_path=save_path)
 
         # Main optimization loop
         for iter in range(self.n_iter):
-
             print(f"Iteration {iter+1}/{self.n_iter} started.")
             
             self.relative_sampler.set_train_data(
@@ -120,23 +119,15 @@ class BayesianOptimization:
             self.F_all = torch.cat([self.F_all, F_new], dim=0)
 
             # Record the new data
-            self._record("relative")
+            self._record("relative", save_path=save_path)
 
             logging.info(f"Iteration {iter+1}/{self.n_iter} completed.")
 
         logging.info("Optimization completed.")
 
-    def _record(self, sampler_name: str):
+    def _record(self, sampler_name: str, save_path: Optional[str] = None):
         """
-        Record the optimization history.
-
-        Columns should include:
-        - Objective variables (one column per dimension, e.g., x0, x1, ...)
-        - Objective values with noise (Y)
-        - Objective values without noise (true values, F)
-        - Best objective value with noise so far (y_best)
-        - Best objective value without noise so far (f_best)
-        - Sampler name (e.g., independent or relative)
+        Record the optimization history and optionally save to a CSV file.
         """
         X = self.X_all
         Y = self.Y_all.unsqueeze(-1) if self.Y_all.dim() == 1 else self.Y_all
@@ -195,6 +186,13 @@ class BayesianOptimization:
 
             # Append the new batch to history_df
             self.history_df = pd.concat([self.history_df, df], axis=0).reset_index(drop=True)
+
+        # Save history_df incrementally to CSV
+        if save_path:
+            write_header = not os.path.exists(save_path)
+            self.history_df.tail(self.batch_size).to_csv(
+                save_path, mode='a', header=write_header, index=False
+            )
 
     def report(self, max_rows: Optional[int] = None, save_path: Optional[str] = None):
         if self.history_df is None:

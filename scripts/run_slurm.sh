@@ -6,7 +6,7 @@
 #SBATCH --partition=cluster_short
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=20
+#SBATCH --cpus-per-task=5
 #SBATCH --time=4:00:00
 
 # Experiment settings

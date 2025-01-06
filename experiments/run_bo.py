@@ -40,7 +40,7 @@ class Experiment:
             sampler_settings.get("acqf", "log_ei"),
             sampler_settings.get("sampler_args", {}),
         )
-
+    
     def run(self, save_dir: str):
         n_initial_eval, initial_sample_method, n_iter, batch_size, is_maximize, device, dtype, seed = self._unpack_basic_settings()
         objective_function, noise_std, outlier_prob, outlier_scale, outlier_std = self._unpack_objective_settings()
@@ -68,8 +68,7 @@ class Experiment:
             sampler_args=sampler_args,
         )
 
-        bo.run()
-
+        # Save directory and file paths
         _seed = seed
         _obj = self.settings["objective"]["function"]
         filename_csv = f"{_obj}_{self.sampler_type}_{acqf_name}_{_seed}.csv"
@@ -77,9 +76,20 @@ class Experiment:
         filename_png = f"{_obj}_{self.sampler_type}_{acqf_name}_{_seed}.png"
         filepath_png = os.path.join(save_dir, filename_png)
 
+        # Ensure directory exists
+        os.makedirs(save_dir, exist_ok=True)
+
+        # Log and run optimization
+        logging.info(f"Starting Bayesian Optimization with settings: {self.settings}")
+        logging.info(f"Results will be saved to: {filepath_csv}")
+
+        # Run the Bayesian Optimization with incremental saving
+        bo.run(save_path=filepath_csv)
+
+        # Generate final report
         bo.report(save_path=filepath_png)
-        bo.history_df.to_csv(filepath_csv, index=False)
-        
+        logging.info(f"Optimization completed. Results saved to {filepath_csv} and {filepath_png}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
