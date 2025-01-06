@@ -1,7 +1,7 @@
 #!/bin/bash -l
 
 # SLURM directives
-#SBATCH --job-name=tf_experiment
+#SBATCH --job-name=bo_experiment
 #SBATCH --output=%x_%j.log
 #SBATCH --partition=cluster_short
 #SBATCH --nodes=1
@@ -54,8 +54,6 @@ create_slurm_job() {
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=20
 #SBATCH --time=4:00:00
-
-module load python
 
 python3 "experiments/${EXPERIMENT_SCRIPT}" \
     --config "${SETTINGS_FILE}" \

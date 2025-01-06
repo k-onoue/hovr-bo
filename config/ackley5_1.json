@@ -68,7 +68,7 @@
                 }
             }
         },
-        "llla_art": {
+        "llla_artl": {
             "acqf": "log_nei",
             "sampler_args": {
                 "surrogate_args": {
