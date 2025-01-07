@@ -41,12 +41,12 @@ class IndependentSampler(Sampler):
             samples = sobol.draw(num).to(device=device, dtype=dtype)
             samples = bounds[0] + (bounds[1] - bounds[0]) * samples
         elif self.sample_method == "random": 
-            generator = torch.Generator(device=device).manual_seed(seed)
+            generator = torch.Generator().manual_seed(seed)
             samples = torch.rand(
                 size=(num, dim),
-                genenerator=generator, 
-                device=device, 
-                dtype=dtype
+                generator=generator, 
+                dtype=dtype,
+                device=device 
             )
             samples = bounds[0] + (bounds[1] - bounds[0]) * samples
         else:
