@@ -48,6 +48,7 @@ class BayesianOptimization:
         ).t()
     
         self.indenpendent_sampler = IndependentSampler(
+            seed=self.seed,
             n_initial_eval=n_initial_eval,
             bounds=self.bounds,
             sample_method=initial_sample_method,
