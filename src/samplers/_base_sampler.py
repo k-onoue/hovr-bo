@@ -43,8 +43,7 @@ class IndependentSampler(Sampler):
         elif self.sample_method == "random": 
             generator = torch.Generator(device=device).manual_seed(seed)
             samples = torch.rand(
-                num, 
-                bounds.shape[1], 
+                size=(num, bounds.shape[1]),
                 genenerator=generator, 
                 device=device, 
                 dtype=dtype
