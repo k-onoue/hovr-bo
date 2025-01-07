@@ -14,12 +14,14 @@ class Sampler(ABC):
 class IndependentSampler(Sampler):
     def __init__(
         self, 
+        seed,
         n_initial_eval, 
         bounds: torch.Tensor,
         sample_method: Literal["sobol", "random"] = "sobol",
         dtype=None,
-        device=None,
+        device=None
     ):
+        self.seed = seed
         self.n_initial_eval = n_initial_eval
         self.bounds = bounds
         self.sample_method = sample_method
@@ -27,6 +29,7 @@ class IndependentSampler(Sampler):
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def sample(self) -> torch.Tensor:
+        seed = self.seed
         bounds = self.bounds
         device = self.device
         dtype = self.dtype
@@ -34,11 +37,18 @@ class IndependentSampler(Sampler):
         num = self.n_initial_eval
 
         if self.sample_method == "sobol":
-            sobol = torch.quasirandom.SobolEngine(dimension=dim)
+            sobol = torch.quasirandom.SobolEngine(dimension=dim, seed=seed)
             samples = sobol.draw(num).to(device=device, dtype=dtype)
             samples = bounds[0] + (bounds[1] - bounds[0]) * samples
         elif self.sample_method == "random": 
-            samples = torch.rand(num, bounds.shape[1], device=device, dtype=dtype)
+            generator = torch.Generator(device=device).manual_seed(seed)
+            samples = torch.rand(
+                num, 
+                bounds.shape[1], 
+                genenerator=generator, 
+                device=device, 
+                dtype=dtype
+            )
             samples = bounds[0] + (bounds[1] - bounds[0]) * samples
         else:
             raise ValueError(f"Unknown sample method: {self.sample_method}")

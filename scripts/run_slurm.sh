@@ -23,7 +23,7 @@ fi
 SETTINGS_FILE=$1
 
 # Generate timestamp (format: YYYY-MM-DD_HH-mm-ss)
-TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S.%3N")
 
 # Create backup directory and copy files
 RESULTS_DIR="results/${TIMESTAMP}"
@@ -52,7 +52,7 @@ create_slurm_job() {
 #SBATCH --partition=cluster_short
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=20
+#SBATCH --cpus-per-task=5
 #SBATCH --time=4:00:00
 
 python3 "experiments/${EXPERIMENT_SCRIPT}" \
