@@ -83,7 +83,7 @@ class LastVBSampler(RelativeSampler):
         elif self.acqf_name == "log_nei":
             acquisition_function = base_acqf(X_baseline=train_X)
         elif self.acqf_name == "ucb":
-            acquisition_function = base_acqf(beta=0.1)
+            acquisition_function = base_acqf(beta=2)
         else:
             raise NotImplementedError(f"Acquisition function '{self.acqf_name}' is not supported.")
 
@@ -103,7 +103,7 @@ class LastVBSampler(RelativeSampler):
             bounds=bounds,
             q=self.batch_size,
             num_restarts=10,
-            raw_samples=50,
+            raw_samples=512,
         )
         
         return candidates

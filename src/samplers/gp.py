@@ -8,6 +8,7 @@ from botorch.sampling import SobolQMCNormalSampler
 from gpytorch.mlls import ExactMarginalLogLikelihood
 
 from ._base_sampler import RelativeSampler
+from .models.gp import PredefinedSingleTaskGP
 from ._utils import get_acquisition_function
 
 
@@ -39,7 +40,7 @@ class GPSampler(RelativeSampler):
             **kwargs
         )
         
-        self.surrogate = SingleTaskGP
+        self.surrogate = PredefinedSingleTaskGP
         self.acqf_name = acqf_name
     
     def _initialize_acquisition(
@@ -61,7 +62,7 @@ class GPSampler(RelativeSampler):
         elif self.acqf_name == "log_nei":
             acquisition_function = base_acqf(X_baseline=train_X)
         elif self.acqf_name == "ucb":
-            acquisition_function = base_acqf(beta=0.1)
+            acquisition_function = base_acqf(beta=2)
         else:
             raise NotImplementedError(f"Acquisition function '{self.acqf_name}' is not supported.")
 
@@ -83,7 +84,7 @@ class GPSampler(RelativeSampler):
             bounds=bounds,
             q=self.batch_size,
             num_restarts=10,
-            raw_samples=50,
+            raw_samples=512,
         )
         
         return candidates
