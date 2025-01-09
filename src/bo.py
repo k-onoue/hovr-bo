@@ -87,9 +87,9 @@ class BayesianOptimization:
         F_data = df['F'].astype(float).to_numpy()
         
         # Convert to tensors
-        self.X_all = torch.tensor(X_data, dtype=self.dtype, device=self.device)
-        self.Y_all = torch.tensor(Y_data, dtype=self.dtype, device=self.device)
-        self.F_all = torch.tensor(F_data, dtype=self.dtype, device=self.device)
+        self.X_all = torch.tensor(X_data, dtype=self.dtype, device=self.device).reshape(-1, n_dim)
+        self.Y_all = torch.tensor(Y_data, dtype=self.dtype, device=self.device).reshape(-1, 1)
+        self.F_all = torch.tensor(F_data, dtype=self.dtype, device=self.device).reshape(-1, 1)
         self.history_df = df
         
         # Return number of completed relative sampler iterations
