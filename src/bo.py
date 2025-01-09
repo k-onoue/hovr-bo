@@ -146,8 +146,8 @@ class BayesianOptimization:
         for i in range(len(X)):
             row = {f'x{j}': X[i,j] for j in range(X.shape[1])}
             row.update({
-                'Y': Y[i],
-                'F': F[i],
+                'Y': float(Y[i]),
+                'F': float(F[i]),
                 'y_best': y_best.item(),
                 'f_best': f_best.item(),
                 'sampler': sampler_name
