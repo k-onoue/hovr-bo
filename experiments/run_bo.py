@@ -46,6 +46,27 @@ class Experiment:
         objective_function, noise_std, outlier_prob, outlier_scale, outlier_std = self._unpack_objective_settings()
         sampler, acqf_name, sampler_args = self._unpack_sampler_settings()
 
+        _seed = seed
+        _obj = self.settings["objective"]["function"]
+        filename_csv = f"{_obj}_{self.sampler_type}_{acqf_name}_{_seed}.csv"
+        filepath_csv = os.path.join(save_dir, filename_csv)
+        filename_png = f"{_obj}_{self.sampler_type}_{acqf_name}_{_seed}.png"
+        filepath_png = os.path.join(save_dir, filename_png)
+
+        os.makedirs(save_dir, exist_ok=True)
+
+        if os.path.exists(filepath_csv):
+            df = pd.read_csv(filepath_csv)
+            completed_iters = len(df[df['sampler'] == 'relative']) // batch_size
+            remaining_iters = n_iter - completed_iters
+            
+            if remaining_iters <= 0:
+                logging.info("Previous run was completed")
+                return
+                
+            n_iter = remaining_iters
+            logging.info(f"Resuming optimization for {remaining_iters} iterations")
+
         objective_function = objective_function(
             noise_std=noise_std,
             outlier_prob=outlier_prob,
@@ -68,25 +89,10 @@ class Experiment:
             sampler_args=sampler_args,
         )
 
-        # Save directory and file paths
-        _seed = seed
-        _obj = self.settings["objective"]["function"]
-        filename_csv = f"{_obj}_{self.sampler_type}_{acqf_name}_{_seed}.csv"
-        filepath_csv = os.path.join(save_dir, filename_csv)
-        filename_png = f"{_obj}_{self.sampler_type}_{acqf_name}_{_seed}.png"
-        filepath_png = os.path.join(save_dir, filename_png)
-
-        # Ensure directory exists
-        os.makedirs(save_dir, exist_ok=True)
-
-        # Log and run optimization
         logging.info(f"Starting Bayesian Optimization with settings: {self.settings}")
         logging.info(f"Results will be saved to: {filepath_csv}")
 
-        # Run the Bayesian Optimization with incremental saving
         bo.run(save_path=filepath_csv)
-
-        # Generate final report
         bo.report(save_path=filepath_png)
         logging.info(f"Optimization completed. Results saved to {filepath_csv} and {filepath_png}")
 

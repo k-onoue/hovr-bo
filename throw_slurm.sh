@@ -3,7 +3,7 @@
 # Function to run sbatch and sleep for a specified time
 run_with_delay() {
     sbatch "$1" "$2"
-    sleep 1  # Delay for 1 second
+    sleep 60  # Delay for 1 second
 }
 
 run_with_delay scripts/run_slurm.sh config/ackley2_1.json
@@ -24,8 +24,8 @@ run_with_delay scripts/run_slurm.sh config/branin_3.json
 run_with_delay scripts/run_slurm.sh config/hartmann_3.json
 run_with_delay scripts/run_slurm.sh config/synthetic_3.json
 
-run_with_delay scripts/run_slurm.sh config/ackley2_3.json
-run_with_delay scripts/run_slurm.sh config/ackley5_3.json
-run_with_delay scripts/run_slurm.sh config/branin_3.json
-run_with_delay scripts/run_slurm.sh config/hartmann_3.json
-run_with_delay scripts/run_slurm.sh config/synthetic_3.json
+run_with_delay scripts/run_slurm.sh config/ackley2_4.json
+run_with_delay scripts/run_slurm.sh config/ackley5_4.json
+run_with_delay scripts/run_slurm.sh config/branin_4.json
+run_with_delay scripts/run_slurm.sh config/hartmann_4.json
+run_with_delay scripts/run_slurm.sh config/synthetic_4.json
