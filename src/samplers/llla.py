@@ -107,7 +107,7 @@ class LastLaplaceL2Sampler(RelativeSampler):
         if self.acqf_name == "log_ei":
             acquisition_function = base_acqf(best_f=train_Y.max())
         elif self.acqf_name == "log_nei":
-            acquisition_function = base_acqf(X_baseline=train_X)
+            acquisition_function = base_acqf(X_baseline=train_X, cache_root=False)
         elif self.acqf_name == "ucb":
             acquisition_function = base_acqf(beta=2)
         else:
@@ -262,7 +262,7 @@ class LastLaplaceARTLSampler(RelativeSampler):
         if self.acqf_name == "log_ei":
             acquisition_function = base_acqf(best_f=train_Y.max())
         elif self.acqf_name == "log_nei":
-            acquisition_function = base_acqf(X_baseline=train_X)
+            acquisition_function = base_acqf(X_baseline=train_X, cache_root=False)
         elif self.acqf_name == "ucb":
             acquisition_function = base_acqf(beta=2)
         else:
