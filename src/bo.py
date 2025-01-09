@@ -76,15 +76,23 @@ class BayesianOptimization:
             random.seed(self.seed)
 
     def load_existing_data(self, filepath: str):
+        """Load data from previous run with proper type conversion."""
         df = pd.read_csv(filepath)
         n_dim = len([col for col in df.columns if col.startswith('x')])
-        data = df.to_numpy()
         
-        self.X_all = torch.tensor(data[:, :n_dim], dtype=self.dtype, device=self.device)
-        self.Y_all = torch.tensor(data[:, n_dim], dtype=self.dtype, device=self.device)
-        self.F_all = torch.tensor(data[:, n_dim + 1], dtype=self.dtype, device=self.device)
+        # Convert input columns to float
+        X_cols = [f'x{i}' for i in range(n_dim)]
+        X_data = df[X_cols].astype(float).to_numpy()
+        Y_data = df['Y'].astype(float).to_numpy()
+        F_data = df['F'].astype(float).to_numpy()
+        
+        # Convert to tensors
+        self.X_all = torch.tensor(X_data, dtype=self.dtype, device=self.device)
+        self.Y_all = torch.tensor(Y_data, dtype=self.dtype, device=self.device)
+        self.F_all = torch.tensor(F_data, dtype=self.dtype, device=self.device)
         self.history_df = df
         
+        # Return number of completed relative sampler iterations
         return len(df[df['sampler'] == 'relative'])
 
     def run(self, save_path: Optional[str] = None):
