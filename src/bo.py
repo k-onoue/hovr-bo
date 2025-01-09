@@ -108,14 +108,22 @@ class BayesianOptimization:
             self._record("independent", save_path=save_path)
 
         for _ in range(self.n_iter):
-            X_new = self.relative_sampler.sample(self.X_all, self.Y_all)
+
+            self.relative_sampler.set_train_data(
+                train_X=self.X_all,
+                train_Y=self.Y_all if self.is_maximize else -self.Y_all
+            )
+
+            X_new = self.relative_sampler.sample()
             Y_new, F_new = self._evaluate(X_new)
             
-            self.X_all = torch.cat([self.X_all, X_new])
-            self.Y_all = torch.cat([self.Y_all, Y_new])
-            self.F_all = torch.cat([self.F_all, F_new])
+            self.X_all = torch.cat([self.X_all, X_new], dim=0)
+            self.Y_all = torch.cat([self.Y_all, Y_new], dim=0)
+            self.F_all = torch.cat([self.F_all, F_new], dim=0)
             
-            self._record("relative", save_path=save_path)
+            logging.info(f"Iteration {iter+1}/{self.n_iter} completed.")
+
+        logging.info("Optimization completed.")
 
     def _evaluate(self, X: torch.Tensor):
         Y = self.objective_function(X)
