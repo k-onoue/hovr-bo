@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 import os
+import pandas as pd
 import torch
 from _src import BayesianOptimization, set_logger, get_objective_function, get_sampler
 
