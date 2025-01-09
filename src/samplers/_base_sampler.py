@@ -120,6 +120,10 @@ class RelativeSampler(Sampler):
 
     def sample(self) -> torch.Tensor:
         """Full sampling pipeline with pre/post processing."""
-        train_X, train_Y, norm_bounds = self._pre_process()
-        candidates = self._sample(train_X, train_Y, norm_bounds)
-        return self._post_process(candidates)
+        try:
+            train_X, train_Y, norm_bounds = self._pre_process()
+            candidates = self._sample(train_X, train_Y, norm_bounds)
+            return self._post_process(candidates)
+        except Exception as e:
+            print(f"An error occurred: {e}. Retrying...")
+            return self.sample()

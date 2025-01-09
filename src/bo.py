@@ -120,7 +120,7 @@ class BayesianOptimization:
             self.X_all = torch.cat([self.X_all, X_new], dim=0)
             self.Y_all = torch.cat([self.Y_all, Y_new], dim=0)
             self.F_all = torch.cat([self.F_all, F_new], dim=0)
-            
+            self._record("independent", save_path=save_path)            
             logging.info(f"Iteration {i+1}/{self.n_iter} completed.")
 
         logging.info("Optimization completed.")
