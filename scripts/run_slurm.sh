@@ -15,15 +15,28 @@ EXPERIMENT_SCRIPT="run_bo.py"
 SCRIPT_PATH="${BASH_SOURCE[0]}"
 SCRIPT_NAME=$(basename "${SCRIPT_PATH}")
 
-# Check if SETTINGS_FILE is passed as an argument
-if [ $# -lt 1 ]; then
-    echo "Usage: $SCRIPT_NAME <settings_file>"
+# Check command line arguments
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+    echo "Usage: $SCRIPT_NAME <settings_file> [timestamp]"
+    echo "  timestamp format: YYYY-MM-DD_HH-MM-SS.mmm (optional)"
     exit 1
 fi
 SETTINGS_FILE=$1
 
-# Generate timestamp (format: YYYY-MM-DD_HH-mm-ss)
-TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S.%3N")
+# Handle timestamp
+if [ $# -eq 2 ]; then
+    # Validate timestamp format
+    if [[ ! $2 =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}\.[0-9]{3}$ ]]; then
+        echo "Error: Invalid timestamp format. Expected: YYYY-MM-DD_HH-MM-SS.mmm"
+        exit 1
+    fi
+    TIMESTAMP=$2
+    echo "Using provided timestamp: ${TIMESTAMP}"
+else
+    # Generate new timestamp
+    TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S.%3N")
+    echo "Generated new timestamp: ${TIMESTAMP}"
+fi
 
 # Create backup directory and copy files
 RESULTS_DIR="results/${TIMESTAMP}"
