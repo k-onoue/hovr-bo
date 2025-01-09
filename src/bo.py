@@ -107,7 +107,7 @@ class BayesianOptimization:
             self.F_all = F_init
             self._record("independent", save_path=save_path)
 
-        for _ in range(self.n_iter):
+        for i in range(self.n_iter):
 
             self.relative_sampler.set_train_data(
                 train_X=self.X_all,
@@ -121,7 +121,7 @@ class BayesianOptimization:
             self.Y_all = torch.cat([self.Y_all, Y_new], dim=0)
             self.F_all = torch.cat([self.F_all, F_new], dim=0)
             
-            logging.info(f"Iteration {iter+1}/{self.n_iter} completed.")
+            logging.info(f"Iteration {i+1}/{self.n_iter} completed.")
 
         logging.info("Optimization completed.")
 
