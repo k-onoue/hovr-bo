@@ -120,7 +120,8 @@ class BayesianOptimization:
             self.X_all = torch.cat([self.X_all, X_new], dim=0)
             self.Y_all = torch.cat([self.Y_all, Y_new], dim=0)
             self.F_all = torch.cat([self.F_all, F_new], dim=0)
-            self._record("independent", save_path=save_path)            
+            
+            self._record("relative", save_path=save_path)
             logging.info(f"Iteration {i+1}/{self.n_iter} completed.")
 
         logging.info("Optimization completed.")
@@ -129,40 +130,70 @@ class BayesianOptimization:
         Y = self.objective_function(X)
         F = self.objective_function.evaluate_true(X)
         return Y, F
-
+    
     def _record(self, sampler_name: str, save_path: Optional[str] = None):
-        X = self.X_all.cpu().numpy()
-        Y = self.Y_all.cpu().numpy()
-        F = self.F_all.cpu().numpy()
-        
+        X = self.X_all
+        Y = self.Y_all.unsqueeze(-1) if self.Y_all.dim() == 1 else self.Y_all
+        F = self.F_all.unsqueeze(-1) if self.F_all.dim() == 1 else self.F_all
+
         if self.is_maximize:
-            y_best = torch.max(self.Y_all)
-            f_best = torch.max(self.F_all)
+            y_best = Y.max()
+            f_best = F.max()
         else:
-            y_best = torch.min(self.Y_all)
-            f_best = torch.min(self.F_all)
-        
-        data = []
-        for i in range(len(X)):
-            row = {f'x{j}': X[i,j] for j in range(X.shape[1])}
-            row.update({
-                'Y': float(Y[i]),
-                'F': float(F[i]),
-                'y_best': y_best.item(),
-                'f_best': f_best.item(),
-                'sampler': sampler_name
-            })
-            data.append(row)
-            
-        new_df = pd.DataFrame(data)
-        
+            y_best = Y.min()
+            f_best = F.min()
+
+        # Convert to CPU for compatibility with Pandas
+        X_np = X.cpu().numpy()
+        Y_np = Y.cpu().numpy()
+        F_np = F.cpu().numpy()
+        y_best_np = y_best.cpu().numpy()
+        f_best_np = f_best.cpu().numpy()
+
         if self.history_df is None:
-            self.history_df = new_df
+            # Initialize history_df on the first iteration
+            _ones = np.ones_like(Y_np)
+            self.history_df = pd.DataFrame(
+                np.concatenate([X_np, Y_np, F_np], axis=1),
+                columns=[f"x{i}" for i in range(X.shape[1])] + ["Y", "F"]
+            )
+            self.history_df["y_best"] = y_best_np * _ones
+            self.history_df["f_best"] = f_best_np * _ones
+            self.history_df["sampler"] = sampler_name
         else:
-            self.history_df = pd.concat([self.history_df, new_df], ignore_index=True)
+            # Update history_df with new data
+            X_batch = X[-self.batch_size:, :].cpu().numpy()
+            Y_batch = Y[-self.batch_size:, :].cpu().numpy()
+            F_batch = F[-self.batch_size:, :].cpu().numpy()
             
+            df = pd.DataFrame(
+                np.concatenate([X_batch, Y_batch, F_batch], axis=1),
+                columns=[f"x{i}" for i in range(X.shape[1])] + ["Y", "F"]
+            )
+
+            # Compute the cumulative best `y_best` and `f_best`
+            prev_y_best = self.history_df["y_best"].iloc[-1]
+            prev_f_best = self.history_df["f_best"].iloc[-1]
+            
+            if self.is_maximize:
+                new_y_best = max(prev_y_best, y_best_np.item())
+                new_f_best = max(prev_f_best, f_best_np.item())
+            else:
+                new_y_best = min(prev_y_best, y_best_np.item())
+                new_f_best = min(prev_f_best, f_best_np.item())
+
+            _ones = np.ones_like(Y_batch)
+            df["y_best"] = new_y_best * _ones
+            df["f_best"] = new_f_best * _ones
+            df["sampler"] = sampler_name
+
+            self.history_df = pd.concat([self.history_df, df], ignore_index=True)
+
         if save_path:
-            self.history_df.to_csv(save_path, index=False)
+            write_header = not os.path.exists(save_path)
+            self.history_df.tail(self.batch_size).to_csv(
+                save_path, mode='a', header=write_header, index=False
+            )
 
     def report(self, max_rows: Optional[int] = None, save_path: Optional[str] = None):
         if self.history_df is None:
@@ -236,4 +267,3 @@ class BayesianOptimization:
             fig.write_image(save_path)
         else:
             fig.show()
-
